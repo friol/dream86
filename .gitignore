@@ -1,0 +1,5 @@
+/.vscode
+/Cargo.lock
+/programs
+/target
+/writeLog.txt
