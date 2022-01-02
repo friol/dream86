@@ -1,10 +1,11 @@
-/* dream86 - 2o21 - v0.4 */
+/* dream86 - 2o22 - v0.4 */
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
 use std::process;
 use std::{thread, time};
+use std::collections::HashMap;
 
 mod vga;
 mod machine;
@@ -15,8 +16,8 @@ mod guiif;
 fn main()
 {
     let mut theVGA=vga::vga::new();
-    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
-    let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
     let mut theCPU=x86cpu::x86cpu::new();
 
@@ -107,7 +108,7 @@ fn main()
                 theMachine.update();
                 inum+=1;
 
-                if (inum>6000)
+                if inum>3000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
@@ -138,7 +139,7 @@ fn main()
                         theMachine.addKeystroke(0x50);
                     }
                     
-                    thread::sleep(time::Duration::from_millis(4));                    
+                    //thread::sleep(time::Duration::from_millis(4));                    
                     inum=0;
                 }
             }

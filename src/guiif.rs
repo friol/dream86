@@ -1,4 +1,4 @@
-/* gui interface */
+/* gui interface - dream86 */
 
 
 use std::collections::HashMap;
@@ -158,10 +158,6 @@ impl guiif
 
         let sin:String=listOfInstructions[self.dbgCursorLine as usize].clone();
         let addr=&sin[5..9];
-
-        /*let mut stdout = stdout();
-        stdout.queue(cursor::MoveTo(0,35));
-        stdout.queue(style::PrintStyledContent(addr.clone().white()));*/
 
         return u16::from_str_radix(addr,16).unwrap();
     }

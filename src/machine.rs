@@ -1,4 +1,4 @@
-/* dream86 - machine 2o21 */
+/* dream86 - machine 2o22 */
 
 use std::process;
 use std::io;
@@ -22,7 +22,7 @@ impl machine
     /*fn debugLog(s:&str)
     {
         println!("{}",s);
-    }
+    }*/
 
     fn loadBIOS(mem:&mut Vec<u8>,fname:&str)
     {
@@ -40,7 +40,7 @@ impl machine
         {
             mem[biosBase+i]=data[i];
         }
-    }*/
+    }
 
     fn loadCOMFile(mem:&mut Vec<u8>,fname:&str)
     {
@@ -204,11 +204,11 @@ impl machine
         if (flatAddr>=0xa0000) && (flatAddr<=0xaffff)
         {
             // VGA framebuffer
-            if flatAddr==0xae628
+            /*if flatAddr==0xae628
             {
                 let mut f = OpenOptions::new().write(true).append(true).open("writeLog.txt").unwrap();
                 writeln!(f,"write at 0x{:04x} val {:04x}",flatAddr,val);
-            }
+            }*/
             pvga.writeMemory16(flatAddr,val);
         }
         else
@@ -232,7 +232,7 @@ impl machine
             machineRAM.push(0);
         }
 
-        //Self::loadBIOS(&mut machineRAM,biosFullPath);
+        //Self::loadBIOS(&mut machineRAM,"./bios/bios_cga");
         Self::loadCOMFile(&mut machineRAM,comFullPath);
 
         let thestack:Vec<u8>=Vec::new();

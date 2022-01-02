@@ -1,8 +1,4 @@
-/* the VGA */
-
-/*
-}
-*/
+/* the VGA - dream86 */
 
 pub struct vga
 {
