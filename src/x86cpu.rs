@@ -8,6 +8,7 @@
     - find a solution for the "any register to any register" fucking instructions
     - remove that fucking warnings
     - optimize. I think we are slow
+    - wrap around registers
     
 */
 
@@ -31,6 +32,9 @@ pub enum instructionType
     instrClc,
     instrCld,
     instrMov,
+    instrMovNoModRegRm,
+    instrAnd,
+    instrAndNoModRegRm,
     instrInc,
     instrDec,
     instrXchg,
@@ -39,7 +43,9 @@ pub enum instructionType
     instrStos,
     instrJmpShort,
     instrInt,
-    instrCall,
+    instrCallRel16,
+    instrCallReg,
+    instrXlat,
 }
 
 pub struct decodedInstruction
@@ -52,9 +58,12 @@ pub struct decodedInstruction
     operand2: String,
     displacement: i32,
     displSize: u8,
+    u8immediate: u8,
+    u16immediate: u16,
     segOverride: String,
     repPrefix: String,
-    debugDecode: String
+    debugDecode: String,
+    opcode: u16
 }    
 
 pub struct x86cpu
@@ -94,9 +103,12 @@ impl x86cpu
             operand2: String::from(""),
             displacement: 0,
             displSize: 0,
+            u8immediate: 0,
+            u16immediate: 0,
             segOverride: String::from(""),
             repPrefix: String::from(""),
-            debugDecode: String::from("Undecodable")
+            debugDecode: String::from("Undecodable"),
+            opcode: 0
         };
 
         x86cpu
@@ -219,14 +231,8 @@ impl x86cpu
         return retVec;
     }
 
-    fn xchgRegs(&mut self,xchgstr:String)
+    fn xchgRegs(&mut self,r0:String,r1:String)
     {
-        // TODO all regs combinations
-
-        let mut rgs=xchgstr.split(",");
-        let r0=rgs.next().unwrap();
-        let r1=rgs.next().unwrap();
-
         if (r0=="AX") && (r1=="CX") { let tmp=self.ax; self.ax=self.cx; self.cx=tmp; }
         else if (r0=="AX") && (r1=="BX") { let tmp=self.ax; self.ax=self.bx; self.bx=tmp; }
         else if (r0=="AX") && (r1=="DX") { let tmp=self.ax; self.ax=self.dx; self.dx=tmp; }
@@ -234,7 +240,6 @@ impl x86cpu
         else if (r0=="AX") && (r1=="SI") { let tmp=self.ax; self.ax=self.si; self.si=tmp; }
         else if (r0=="AX") && (r1=="SP") { let tmp=self.ax; self.ax=self.sp; self.sp=tmp; }
         else if (r0=="AX") && (r1=="BP") { let tmp=self.ax; self.ax=self.bp; self.bp=tmp; }
-        else { self.abort("xchg not supported"); }
     }
 
     fn performLods(&mut self,pmachine:&machine,pvga:&vga)
@@ -330,6 +335,21 @@ impl x86cpu
         }
     }
 
+    fn performXlat(&mut self,pmachine:&mut machine,pvga:&mut vga)
+    {
+        let mut readSeg:u16=self.ds;
+        if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
+        else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
+        else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
+        else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
+
+        let al=self.ax&0xff;
+        let tableval:u16=pmachine.readMemory(readSeg,self.bx+al,pvga) as u16;
+        self.ax=(self.ax&0xff00)|tableval;
+
+        self.ip+=self.decInstr.insLen as u16;
+    }
+
     fn performJmpShort(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
         let jumpAmt=self.decInstr.operand1.parse::<i8>().unwrap();
@@ -356,6 +376,231 @@ impl x86cpu
         }
     }
 
+    fn isRegister(&mut self,rname:&String) -> bool
+    {
+        if (rname=="AX") || (rname=="BX") || (rname=="CX") || (rname=="DX") || (rname=="ES") || (rname=="SS") || (rname=="DS") ||
+           (rname=="CS") || (rname=="BP") || (rname=="IP") || (rname=="DI") || (rname=="SI") || (rname=="SP") ||
+           (rname=="AL") || (rname=="BL") || (rname=="CL") || (rname=="DL") ||
+           (rname=="AH") || (rname=="BH") || (rname=="CH") || (rname=="DH")
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    fn getOperandValue(&mut self,regname:&String,pmachine:&mut machine,pvga:&mut vga) -> u16
+    {
+        if regname=="AX" { return self.ax; }
+        else if regname=="BX" { return self.bx; }
+        else if regname=="CX" { return self.cx; }
+        else if regname=="DX" { return self.dx; }
+        else if regname=="ES" { return self.es; }
+        else if regname=="SS" { return self.ss; }
+        else if regname=="DS" { return self.ds; }
+        else if regname=="CS" { return self.cs; }
+        else if regname=="BP" { return self.bp; }
+        else if regname=="IP" { return self.ip; }
+        else if regname=="DI" { return self.di; }
+        else if regname=="SI" { return self.si; }
+        else if regname=="SP" { return self.sp; }
+        else if regname=="AH" { return (self.ax&0xff00)>>8; }
+        else if regname=="BH" { return (self.bx&0xff00)>>8; }
+        else if regname=="CH" { return (self.cx&0xff00)>>8; }
+        else if regname=="DH" { return (self.dx&0xff00)>>8; }
+        else if regname=="AL" { return (self.ax&0xff); }
+        else if regname=="BL" { return (self.bx&0xff); }
+        else if regname=="CL" { return (self.cx&0xff); }
+        else if regname=="DL" { return (self.dx&0xff); }
+        else if regname=="Direct Addr" 
+        { 
+            if self.decInstr.instrSize==16
+            {
+                let data:u16=pmachine.readMemory16(self.ds,self.decInstr.u16immediate,pvga);
+                return data; 
+            }
+            else if self.decInstr.instrSize==8
+            {
+                let data:u16=pmachine.readMemory(self.ds,self.decInstr.u16immediate,pvga) as u16;
+                return data; 
+            }
+        }
+        else if regname=="[DI]" 
+        { 
+            let data:u16=pmachine.readMemory16(self.ds,self.di,pvga);
+            return data; 
+        }
+        else if regname=="[SI]" 
+        { 
+            let data:u16=pmachine.readMemory16(self.ds,self.si,pvga);
+            return data; 
+        }
+        else if regname=="ib" 
+        { 
+            return self.decInstr.u8immediate as u16; 
+        }
+        else if regname=="iw" 
+        { 
+            return self.decInstr.u16immediate as u16; 
+        }
+        else
+        {
+            self.abort(&format!("Unhandled getOperandValue {}",regname));
+        }
+
+        return 0;
+    }
+
+    fn moveToRegister(&mut self,srcVal:&u16,dstReg:&String)
+    {
+        if dstReg=="AX" { self.ax=*srcVal; }
+        else if dstReg=="BX" { self.bx=*srcVal; }
+        else if dstReg=="CX" { self.cx=*srcVal; }
+        else if dstReg=="DX" { self.dx=*srcVal; }
+        else if dstReg=="ES" { self.es=*srcVal; }
+        else if dstReg=="SS" { self.ss=*srcVal; }
+        else if dstReg=="DS" { self.ds=*srcVal; }
+        else if dstReg=="CS" { self.cs=*srcVal; }
+        else if dstReg=="BP" { self.bp=*srcVal; }
+        else if dstReg=="IP" { self.ip=*srcVal; }
+        else if dstReg=="DI" { self.di=*srcVal; }
+        else if dstReg=="SI" { self.si=*srcVal; }
+        else if dstReg=="SP" { self.sp=*srcVal; }
+        else if dstReg=="AL" { self.ax=(self.ax&0xff00)|((*srcVal)&0xff); }
+        else if dstReg=="AH" { self.ax=(self.ax&0xff)|((*srcVal)<<8); }
+        else if dstReg=="BL" { self.bx=(self.bx&0xff00)|((*srcVal)&0xff); }
+        else if dstReg=="BH" { self.bx=(self.bx&0xff)|((*srcVal)<<8); }
+        else if dstReg=="CL" { self.cx=(self.cx&0xff00)|((*srcVal)&0xff); }
+        else if dstReg=="CH" { self.cx=(self.cx&0xff)|((*srcVal)<<8); }
+        else if dstReg=="DL" { self.dx=(self.dx&0xff00)|((*srcVal)&0xff); }
+        else if dstReg=="DH" { self.dx=(self.dx&0xff)|((*srcVal)<<8); }
+        else
+        {
+            self.abort(&format!("Unhandled moveToRegister {} {}",dstReg,srcVal));
+        }
+    }
+
+    fn doAnd(&mut self,srcVal:&u16,dstReg:&String)
+    {
+        if dstReg=="AH" 
+        { 
+            // TODO flags, other regs
+            let mut lop:u8=0;
+            let mut rop:u8=0;
+            lop=((self.ax&0xff00)>>8) as u8;
+            rop=(self.bx&0xff) as u8;
+            lop&=rop;
+            self.ax=((lop as u16)<<8)|(self.ax&0xff);
+            self.doZflag(lop as u16);
+            self.doPflag(lop as u16);
+        }
+        else
+        {
+            self.abort(&format!("Unhandled doAnd {} {}",dstReg,srcVal));
+        }
+    }
+
+    // when things get hard
+    fn performMove(&mut self,pmachine:&mut machine,pvga:&mut vga)
+    {
+        let srcReg=self.decInstr.operand1.clone();
+        let dstReg=self.decInstr.operand2.clone();
+
+        let mut srcVal:u16=0;
+        srcVal=self.getOperandValue(&srcReg,pmachine,pvga); 
+
+        if self.isRegister(&dstReg) 
+        { 
+            self.moveToRegister(&srcVal,&dstReg); 
+        }
+        else if dstReg=="Direct Addr"
+        {
+            let mut writeSeg:u16=self.ds;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+    
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,self.decInstr.u16immediate,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,self.decInstr.u16immediate,srcVal as u8,pvga); }
+        }
+        else if dstReg=="[SI]"
+        {
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,self.si,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,self.si,srcVal as u8,pvga); }
+        }
+        else if dstReg.contains("[SI+Disp]")
+        {
+            let mut si32:i32=self.si as i32;
+            si32+=self.decInstr.displacement;
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,si32 as u16,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,si32 as u16,srcVal as u8,pvga); }
+        }
+        else if dstReg.contains("[DI+Disp]")
+        {
+            let mut di32:i32=self.di as i32;
+            di32+=self.decInstr.displacement;
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,di32 as u16,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,di32 as u16,srcVal as u8,pvga); }
+        }
+        else
+        {
+            self.abort(&format!("Unhandled performMove {} {}",dstReg,srcReg));
+        }
+
+        self.ip+=self.decInstr.insLen as u16;
+    }
+
+    fn performAnd(&mut self,pmachine:&mut machine,pvga:&mut vga)
+    {
+        let srcReg=self.decInstr.operand1.clone();
+        let dstReg=self.decInstr.operand2.clone();
+
+        let mut srcVal:u16=0;
+        srcVal=self.getOperandValue(&srcReg,pmachine,pvga); 
+
+        if self.isRegister(&dstReg) 
+        { 
+            self.doAnd(&srcVal,&dstReg); 
+        }
+        /*else if dstReg=="Direct Addr"
+        {
+            let mut writeSeg:u16=self.ds;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+    
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,self.decInstr.u16immediate,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,self.decInstr.u16immediate,srcVal as u8,pvga); }
+        }
+        else if dstReg=="[SI]"
+        {
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,self.si,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,self.si,srcVal as u8,pvga); }
+        }
+        else if dstReg.contains("[SI+Disp]")
+        {
+            let mut si32:i32=self.si as i32;
+            si32+=self.decInstr.displacement;
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,si32 as u16,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,si32 as u16,srcVal as u8,pvga); }
+        }
+        else if dstReg.contains("[DI+Disp]")
+        {
+            let mut di32:i32=self.di as i32;
+            di32+=self.decInstr.displacement;
+            if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,di32 as u16,srcVal,pvga); }
+            else if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,di32 as u16,srcVal as u8,pvga); }
+        }*/
+        else
+        {
+            self.abort(&format!("Unhandled performAnd {} {}",dstReg,srcReg));
+        }
+
+        self.ip+=self.decInstr.insLen as u16;
+    }
+
     fn getInstructionType(&self,it:&String) -> instructionType
     {
         if it=="Pop" { return instructionType::instrPop; }
@@ -373,113 +618,151 @@ impl x86cpu
         else if it=="Stos" { return instructionType::instrStos; }
         else if it=="JmpShort" { return instructionType::instrJmpShort; }
         else if it=="Int" { return instructionType::instrInt; }
-        else if it=="Call" { return instructionType::instrCall; }
+        else if it=="CallReg" { return instructionType::instrCallReg; }
+        else if it=="CallRel16" { return instructionType::instrCallRel16; }
+        else if it=="Mov" { return instructionType::instrMov; }
+        else if it=="MovNMRR" { return instructionType::instrMovNoModRegRm; }
+        else if it=="And" { return instructionType::instrAnd; }
+        else if it=="Xlat" { return instructionType::instrXlat; }
         else { return instructionType::instrNone; }
     }
 
-    fn getOpcodeStructure(&self,opcode:&u8,found:&mut bool) -> [&str;5]
+    fn getOpcodeStructure(&self,opcode:&u16,found:&mut bool) -> [&str;7]
     {
         // opcode info format:
-        // dbg instruction, instruction bit size, number of arguments, arg1, instruction type
+        // dbg instruction, instruction bit size, number of arguments, arg1, arg2, instruction type, invert operands
 
         match opcode
         {
             // POP 16 bit reg
-            0x07 => { return ["POP ES","16","1","ES","Pop"]; }
-            0x17 => { return ["POP SS","16","1","SS","Pop"]; }
-            0x1f => { return ["POP DS","16","1","DS","Pop"]; }
-            0x58 => { return ["POP AX","16","1","AX","Pop"]; }
-            0x59 => { return ["POP CX","16","1","CX","Pop"]; }
-            0x5a => { return ["POP DX","16","1","DX","Pop"]; }
-            0x5b => { return ["POP BX","16","1","BX","Pop"]; }
-            0x5c => { return ["POP SP","16","1","SP","Pop"]; }
-            0x5d => { return ["POP BP","16","1","BP","Pop"]; }
-            0x5e => { return ["POP SI","16","1","SI","Pop"]; }
-            0x5f => { return ["POP DI","16","1","DI","Pop"]; }
+            0x07 => { return ["POP ES","16","1","ES","","Pop","0"]; }
+            0x17 => { return ["POP SS","16","1","SS","","Pop","0"]; }
+            0x1f => { return ["POP DS","16","1","DS","","Pop","0"]; }
+            0x58 => { return ["POP AX","16","1","AX","","Pop","0"]; }
+            0x59 => { return ["POP CX","16","1","CX","","Pop","0"]; }
+            0x5a => { return ["POP DX","16","1","DX","","Pop","0"]; }
+            0x5b => { return ["POP BX","16","1","BX","","Pop","0"]; }
+            0x5c => { return ["POP SP","16","1","SP","","Pop","0"]; }
+            0x5d => { return ["POP BP","16","1","BP","","Pop","0"]; }
+            0x5e => { return ["POP SI","16","1","SI","","Pop","0"]; }
+            0x5f => { return ["POP DI","16","1","DI","","Pop","0"]; }
             // PUSH 16 bit reg
-            0x06 => { return ["PUSH ES","16","1","ES","Push"]; }
-            0x0e => { return ["PUSH CS","16","1","CS","Push"]; }
-            0x16 => { return ["PUSH SS","16","1","SS","Push"]; }
-            0x1e => { return ["PUSH DS","16","1","DS","Push"]; }
-            0x50 => { return ["PUSH AX","16","1","AX","Push"]; }
-            0x51 => { return ["PUSH CX","16","1","CX","Push"]; }
-            0x52 => { return ["PUSH DX","16","1","DX","Push"]; }
-            0x53 => { return ["PUSH BX","16","1","BX","Push"]; }
-            0x54 => { return ["PUSH SP","16","1","SP","Push"]; }
-            0x55 => { return ["PUSH BP","16","1","BP","Push"]; }
-            0x56 => { return ["PUSH SI","16","1","SI","Push"]; }
-            0x57 => { return ["PUSH DI","16","1","DI","Push"]; }
+            0x06 => { return ["PUSH ES","16","1","ES","","Push","0"]; }
+            0x0e => { return ["PUSH CS","16","1","CS","","Push","0"]; }
+            0x16 => { return ["PUSH SS","16","1","SS","","Push","0"]; }
+            0x1e => { return ["PUSH DS","16","1","DS","","Push","0"]; }
+            0x50 => { return ["PUSH AX","16","1","AX","","Push","0"]; }
+            0x51 => { return ["PUSH CX","16","1","CX","","Push","0"]; }
+            0x52 => { return ["PUSH DX","16","1","DX","","Push","0"]; }
+            0x53 => { return ["PUSH BX","16","1","BX","","Push","0"]; }
+            0x54 => { return ["PUSH SP","16","1","SP","","Push","0"]; }
+            0x55 => { return ["PUSH BP","16","1","BP","","Push","0"]; }
+            0x56 => { return ["PUSH SI","16","1","SI","","Push","0"]; }
+            0x57 => { return ["PUSH DI","16","1","DI","","Push","0"]; }
             // POPF, PUSHF
-            0x9c => { return ["PUSHF","16","0","","Pushf"]; }
-            0x9d => { return ["POPF","16","0","","Popf"]; }
+            0x9c => { return ["PUSHF","16","0","","","Pushf","0"]; }
+            0x9d => { return ["POPF","16","0","","","Popf","0"]; }
             // RET, CLC, CLD
-            0xc3 => { return ["RET","16","0","","Ret"]; }
-            0xf8 => { return ["CLC","16","0","","Clc"]; }
-            0xfc => { return ["CLD","16","0","","Cld"]; }
+            0xc3 => { return ["RET","16","0","","","Ret","0"]; }
+            0xf8 => { return ["CLC","16","0","","","Clc","0"]; }
+            0xfc => { return ["CLD","16","0","","","Cld","0"]; }
             // INC 16bit reg
-            0x40 => { return ["INC AX","16","1","AX","Inc"]; }
-            0x41 => { return ["INC CX","16","1","CX","Inc"]; }
-            0x42 => { return ["INC DX","16","1","DX","Inc"]; }
-            0x43 => { return ["INC BX","16","1","BX","Inc"]; }
-            0x44 => { return ["INC SP","16","1","SP","Inc"]; }
-            0x45 => { return ["INC BP","16","1","BP","Inc"]; }
-            0x46 => { return ["INC SI","16","1","SI","Inc"]; }
-            0x47 => { return ["INC DI","16","1","DI","Inc"]; }
+            0x40 => { return ["INC AX","16","1","AX","","Inc","0"]; }
+            0x41 => { return ["INC CX","16","1","CX","","Inc","0"]; }
+            0x42 => { return ["INC DX","16","1","DX","","Inc","0"]; }
+            0x43 => { return ["INC BX","16","1","BX","","Inc","0"]; }
+            0x44 => { return ["INC SP","16","1","SP","","Inc","0"]; }
+            0x45 => { return ["INC BP","16","1","BP","","Inc","0"]; }
+            0x46 => { return ["INC SI","16","1","SI","","Inc","0"]; }
+            0x47 => { return ["INC DI","16","1","DI","","Inc","0"]; }
             // DEC 16bit reg
-            0x48 => { return ["DEC AX","16","1","AX","Dec"]; }
-            0x49 => { return ["DEC CX","16","1","CX","Dec"]; }
-            0x4a => { return ["DEC DX","16","1","DX","Dec"]; }
-            0x4b => { return ["DEC BX","16","1","BX","Dec"]; }
-            0x4c => { return ["DEC SP","16","1","SP","Dec"]; }
-            0x4d => { return ["DEC BP","16","1","BP","Dec"]; }
-            0x4e => { return ["DEC SI","16","1","SI","Dec"]; }
-            0x4f => { return ["DEC DI","16","1","DI","Dec"]; }
-            // XVHG 16bit registers
-            0x91 => { return ["XCHG AX,CX","16","1","AX,CX","Xchg"]; }
-            0x92 => { return ["XCHG AX,DX","16","1","AX,DX","Xchg"]; }
-            0x93 => { return ["XCHG AX,BX","16","1","AX,BX","Xchg"]; }
-            0x94 => { return ["XCHG AX,SP","16","1","AX,SP","Xchg"]; }
-            0x95 => { return ["XCHG AX,BP","16","1","AX,BP","Xchg"]; }
-            0x96 => { return ["XCHG AX,SI","16","1","AX,SI","Xchg"]; }
-            0x97 => { return ["XCHG AX,DI","16","1","AX,DI","Xchg"]; }
+            0x48 => { return ["DEC AX","16","1","AX","","Dec","0"]; }
+            0x49 => { return ["DEC CX","16","1","CX","","Dec","0"]; }
+            0x4a => { return ["DEC DX","16","1","DX","","Dec","0"]; }
+            0x4b => { return ["DEC BX","16","1","BX","","Dec","0"]; }
+            0x4c => { return ["DEC SP","16","1","SP","","Dec","0"]; }
+            0x4d => { return ["DEC BP","16","1","BP","","Dec","0"]; }
+            0x4e => { return ["DEC SI","16","1","SI","","Dec","0"]; }
+            0x4f => { return ["DEC DI","16","1","DI","","Dec","0"]; }
+            // XCHG 16bit registers
+            0x91 => { return ["XCHG AX,CX","16","1","AX","CX","Xchg","0"]; }
+            0x92 => { return ["XCHG AX,DX","16","1","AX","DX","Xchg","0"]; }
+            0x93 => { return ["XCHG AX,BX","16","1","AX","BX","Xchg","0"]; }
+            0x94 => { return ["XCHG AX,SP","16","1","AX","SP","Xchg","0"]; }
+            0x95 => { return ["XCHG AX,BP","16","1","AX","BP","Xchg","0"]; }
+            0x96 => { return ["XCHG AX,SI","16","1","AX","SI","Xchg","0"]; }
+            0x97 => { return ["XCHG AX,DI","16","1","AX","DI","Xchg","0"]; }
             // LODSB/W
-            0xac => { return ["LODSB","8","0","","Lods"]; }
-            0xad => { return ["LODSW","16","0","","Lods"]; }
+            0xac => { return ["LODSB","8","0","","","Lods","0"]; }
+            0xad => { return ["LODSW","16","0","","","Lods","0"]; }
             // MOVSB/W
-            0xa4 => { return ["MOVSB","8","0","","Movs"]; }
-            0xa5 => { return ["MOVSW","16","0","","Movs"]; }
+            0xa4 => { return ["MOVSB","8","0","","","Movs","0"]; }
+            0xa5 => { return ["MOVSW","16","0","","","Movs","0"]; }
             // STOSB/W
-            0xaa => { return ["STOSB","8","0","","Stos"]; }
-            0xab => { return ["STOSW","16","0","","Stos"]; }
+            0xaa => { return ["STOSB","8","0","","","Stos","0"]; }
+            0xab => { return ["STOSW","16","0","","","Stos","0"]; }
             // Jump short
-            0x72 => { return ["JB","8","1","r0","JmpShort"]; }
-            0x73 => { return ["JAE","8","1","r0","JmpShort"]; }
-            0x74 => { return ["JE","8","1","r0","JmpShort"]; }
-            0x75 => { return ["JNE","8","1","r0","JmpShort"]; }
-            0x76 => { return ["JBE","8","1","r0","JmpShort"]; }
-            0x77 => { return ["JA","8","1","r0","JmpShort"]; }
-            0x78 => { return ["JS","8","1","r0","JmpShort"]; }
-            0x7F => { return ["JG","8","1","r0","JmpShort"]; }
-            0xE2 => { return ["LOOP Short","8","1","r0","JmpShort"]; }
-            0xEB => { return ["JMP Short","8","1","r0","JmpShort"]; }
+            0x72 => { return ["JB","8","1","r0","","JmpShort","0"]; }
+            0x73 => { return ["JAE","8","1","r0","","JmpShort","0"]; }
+            0x74 => { return ["JE","8","1","r0","","JmpShort","0"]; }
+            0x75 => { return ["JNE","8","1","r0","","JmpShort","0"]; }
+            0x76 => { return ["JBE","8","1","r0","","JmpShort","0"]; }
+            0x77 => { return ["JA","8","1","r0","","JmpShort","0"]; }
+            0x78 => { return ["JS","8","1","r0","","JmpShort","0"]; }
+            0x7F => { return ["JG","8","1","r0","","JmpShort","0"]; }
+            0xE2 => { return ["LOOP Short","8","1","r0","","JmpShort","0"]; }
+            0xEB => { return ["JMP Short","8","1","r0","","JmpShort","0"]; }
             // INT nn
-            0xcd => { return ["INT","8","1","r0","Int"]; }
-            // CALL 16bit offset
-            0xe8 => { return ["CALL","16","1","r0","Call"]; }
+            0xcd => { return ["INT","8","1","intnum","","Int","0"]; }
+            // CALL 16bit relative offset
+            0xe8 => { return ["CALL","16","1","r0","","CallRel16","0"]; }
+            // MOV instructions (with modregrm byte)
+            0x88 => { return ["MOV","8","2","rmb","rb","Mov","0"]; }
+            0x89 => { return ["MOV","16","2","rmw","rw","Mov","0"]; }
+            0x8e => { return ["MOV","16","2","sr","rmw","Mov","1"]; }
+            0x8b => { return ["MOV","16","2","rw","rmw","Mov","1"]; }
+            0xc6 => { return ["MOV","8","2","ib","rmb","Mov","0"]; }
+            // MOV instructions (without modregrm byte)
+            0xa2 => { return ["MOV","8","2","AL","Direct Addr","MovNMRR","0"]; }
+            0xb0 => { return ["MOV","8","2","ib","AL","MovNMRR","0"]; }
+            0xb1 => { return ["MOV","8","2","ib","CL","MovNMRR","0"]; }
+            0xb2 => { return ["MOV","8","2","ib","DL","MovNMRR","0"]; }
+            0xb3 => { return ["MOV","8","2","ib","BL","MovNMRR","0"]; }
+            0xb4 => { return ["MOV","8","2","ib","AH","MovNMRR","0"]; }
+            0xb5 => { return ["MOV","8","2","ib","CH","MovNMRR","0"]; }
+            0xb6 => { return ["MOV","8","2","ib","DH","MovNMRR","0"]; }
+            0xb7 => { return ["MOV","8","2","ib","BH","MovNMRR","0"]; }
+            0xb8 => { return ["MOV","16","2","iw","AX","MovNMRR","0"]; }
+            0xb9 => { return ["MOV","16","2","iw","CX","MovNMRR","0"]; }
+            0xba => { return ["MOV","16","2","iw","DX","MovNMRR","0"]; }
+            0xbb => { return ["MOV","16","2","iw","BX","MovNMRR","0"]; }
+            0xbc => { return ["MOV","16","2","iw","SP","MovNMRR","0"]; }
+            0xbd => { return ["MOV","16","2","iw","BP","MovNMRR","0"]; }
+            0xbe => { return ["MOV","16","2","iw","SI","MovNMRR","0"]; }
+            0xbf => { return ["MOV","16","2","iw","DI","MovNMRR","0"]; }
+            0xa0 => { return ["MOV","8","2","Direct Addr","AL","MovNMRR","0"]; }
+            0xa3 => { return ["MOV","16","2","AX","Direct Addr","MovNMRR","0"]; }
+            // AND instructions (without modregrm byte)
+            0x20 => { return ["AND","8","2","rmb","rb","And","0"]; }
+            // XLAT
+            0xd7 => { return ["XLAT","16","0","","","Xlat","0"]; }            
+
+            // Multi-instructions
+            0xff02 => { return ["CALL","16","1","rw","","CallReg","0"]; }
 
             _ => { *found=false; }
         }
 
-        return ["","","","",""];
+        return ["","","","","","",""];
     }
 
-    fn prepareInstructionParameters(&self,opcodeInfo:&[&str;5],cs:u16,ip:u16,instrLen:&mut u8,dbgStr:&mut String,
-                                    opsrc:&mut String,opdst:&mut String,displ:&mut i32,displSize:&mut u8,
+    fn prepareInstructionParameters(&self,opcodeInfo:&[&str;7],cs:u16,ip:u16,instrLen:&mut u8,dbgStr:&mut String,instrWidth:&u8,
+                                    opcode:&u16,
+                                    u8op:&mut u8,u16op:&mut u16,
+                                    opsrc:&mut String,opdst:&mut String,displ:&mut i32,displSize:&mut u8,iType:&instructionType,
                                     pmachine:&machine,pvga:&vga)
     {
-        let instrType:String=opcodeInfo[4].to_string();
-
-        if instrType=="JmpShort".to_string()
+        if *iType==instructionType::instrJmpShort
         {
             // JMP<condition> i8 displacement
             *displ=0;
@@ -492,7 +775,7 @@ impl x86cpu
             *opdst="".to_string();
             *instrLen=2;
         }
-        else if instrType=="Int".to_string()
+        else if *iType==instructionType::instrInt
         {
             // INT nn
             *displ=0;
@@ -504,7 +787,7 @@ impl x86cpu
             *opdst="".to_string();
             *instrLen=2;
         }
-        else if instrType=="Call".to_string()
+        else if *iType==instructionType::instrCallRel16
         {
             // CALL relative
             *displ=0;
@@ -515,6 +798,146 @@ impl x86cpu
             *opsrc=offset16.to_string();
             *opdst="".to_string();
             *instrLen=3;
+        }
+        else if *iType==instructionType::instrCallReg
+        {
+            // CALL reg
+            *displ=0;
+            *displSize=0;
+
+            let dstIsSegreg:u8=if (*opsrc=="sr".to_string()) { 1 } else { 0 };
+            let mut wbit:u8=0;
+            if *instrWidth==16 { wbit=1; }
+
+            let addressingModeByte=pmachine.readMemory(cs,ip+1,pvga);
+            let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,dstIsSegreg,wbit);
+
+            dbgStr.push_str(&format!(" {}",&moveVec[0]));
+            *opsrc=moveVec[0].clone();
+            *opdst="".to_string();
+            *instrLen=3;
+        }
+        else if (*iType==instructionType::instrMov) || (*iType==instructionType::instrAnd)
+        {
+            // MOV with modregrm byte
+            let mut totInstrLen:u8=2;
+            let dstIsSegreg:u8=if (*opsrc=="sr".to_string()) { 1 } else { 0 };
+            let mut wbit:u8=0;
+            if *instrWidth==16 { wbit=1; }
+            let mut operandAdder=0;
+            let invertOperands=opcodeInfo[6].parse::<u8>().unwrap();
+            //let invertOperands=if (opcode&2)==2 { 1 } else { 0 };
+
+            let addressingModeByte=pmachine.readMemory(cs,ip+1,pvga);
+            let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,dstIsSegreg,wbit);
+
+            if moveVec[0].contains("with 8bit disp") || moveVec[1].contains("with 8bit disp") { operandAdder=1; }
+            if moveVec[0].contains("with 16bit disp") || moveVec[1].contains("with 16bit disp") { operandAdder=2; }
+
+            let mut op0=0 as usize;
+            let mut op1=1 as usize;
+            if invertOperands==1
+            {
+                op0=1;
+                op1=0;
+            }
+
+            if (*opdst=="sr") || (*opdst=="rb")  || (*opdst=="rw") || (*opdst=="rmb") || (*opdst=="rmw")
+            {
+                *opdst=moveVec[op0].clone();
+            }
+            if (*opsrc=="sr") || (*opsrc=="rb")  || (*opsrc=="rw") || (*opsrc=="rmb") || (*opsrc=="rmw")
+            {
+                *opsrc=moveVec[op1].clone();
+            }
+
+            if (*opdst=="ib")
+            {
+                let ib:u8=pmachine.readMemory(cs,ip+2+operandAdder,pvga);
+                *u8op=ib;
+                totInstrLen+=1;
+            }
+            else if (*opsrc=="ib")
+            {
+                let ib:u8=pmachine.readMemory(cs,ip+2+operandAdder,pvga);
+                *u8op=ib;
+                totInstrLen+=1;
+            }
+
+            // TODO handle other types of src/dest regs
+
+            // TODO handle move from/to memory
+            if *opdst=="Direct Addr"
+            {
+                *u16op=pmachine.readMemory16(cs,ip+2,pvga);
+                totInstrLen+=2;
+            }
+
+            // handle displacements
+            if (*opdst).contains("with 8bit disp") || (*opsrc).contains("with 8bit disp")
+            {
+                *displSize=8;
+                *displ=pmachine.readMemory(cs,ip+2,pvga) as i8 as i32;
+                totInstrLen+=1;
+            }
+            else if (*opdst).contains("with 16bit disp") || (*opsrc).contains("with 16bit disp")
+            {
+                *displSize=16;
+                *displ=pmachine.readMemory16(cs,ip+2,pvga) as i16 as i32;
+                totInstrLen+=2;
+            }
+            else
+            {
+                *displ=0;
+                *displSize=0;
+            }
+
+            // debug string
+            dbgStr.push_str(&format!(" {},{}",*opdst,*opsrc));
+
+            // ilen
+            *instrLen=totInstrLen;
+        }
+        else if *iType==instructionType::instrMovNoModRegRm
+        {
+            *displ=0;
+            *displSize=0;
+
+            if *opsrc=="iw"
+            {
+                let iw:u16=pmachine.readMemory16(cs,ip+1,pvga);
+                *u16op=iw;
+                *instrLen+=2;
+            }
+            else if *opsrc=="ib"
+            {
+                let ib:u8=pmachine.readMemory(cs,ip+1,pvga);
+                *u8op=ib;
+                *instrLen+=1;
+            }
+            else if *opsrc=="Direct Addr"
+            {
+                *u16op=pmachine.readMemory16(cs,ip+1,pvga);
+                *instrLen+=2;
+            }
+
+            if *opdst=="Direct Addr"
+            {
+                *u16op=pmachine.readMemory16(cs,ip+1,pvga);
+                *instrLen+=2;
+            }
+
+            dbgStr.push_str(&format!(" {},{}",*opdst,*opsrc));
+        }
+    }
+
+    fn expandWideInstruction(&self,opcode:&u8,wideOpcode:&mut u16,pmachine:&machine,pvga:&vga,cs:&u16,ip:&u16)
+    {
+        if *opcode==0xff
+        {
+            let instrType=pmachine.readMemory(*cs,*ip,pvga);
+            let reg:usize=((instrType>>3)&0x07).into();
+            *wideOpcode=(reg as u16)|((*opcode as u16)<<8);
         }
     }
 
@@ -553,41 +976,53 @@ impl x86cpu
         else if opcode==0xf2 { repOverride="REPNE".to_string(); }
         if repOverride!="" { opcode=pmachine.readMemory(cs,ip+1,pvga); }
 
+        let mut instrLen=1;
+           
+        if segOverride!="" { instrLen+=1; }
+        if repOverride!="" { instrLen+=1; }
+
         // decode instruction
         let mut wasDecoded=true;
-        let opcodeInfo=self.getOpcodeStructure(&opcode,&mut wasDecoded);
+        let mut wideOpcode:u16=opcode as u16;
+        self.expandWideInstruction(&opcode,&mut wideOpcode,pmachine,pvga,&cs,&(ip+(instrLen as u16)));
+        let opcodeInfo=self.getOpcodeStructure(&wideOpcode,&mut wasDecoded);
         if wasDecoded
         {
             canDecode=true;
-            let mut instrLen=1;
-           
-            if segOverride!="" { instrLen+=1; }
-            if repOverride!="" { instrLen+=1; }
 
             let mut dbgDec:String=opcodeInfo[0].to_string();
             if repOverride!="" { dbgDec=format!("{} {}",repOverride,opcodeInfo[0].to_string()); }
             if segOverride!="" { dbgDec=format!("{} {}",segOverride,opcodeInfo[0].to_string()); }
 
             let mut operandSrc:String=String::from(opcodeInfo[3].to_string());
-            let mut operandDst:String=String::from("");
+            let mut operandDst:String=String::from(opcodeInfo[4].to_string());
+            let mut instrWidth:u8=opcodeInfo[1].parse::<u8>().unwrap();
             let mut displacement:i32=0;
             let mut displSize:u8=0;
+            let mut u8op:u8=0;
+            let mut u16op:u16=0;
+            let instrType=self.getInstructionType(&opcodeInfo[5].to_string());
             self.prepareInstructionParameters(&opcodeInfo,cs,ip,&mut instrLen,&mut dbgDec,
+                                              &instrWidth,&wideOpcode,
+                                              &mut u8op,&mut u16op,
                                               &mut operandSrc,&mut operandDst,
                                               &mut displacement,&mut displSize,
-                                              pmachine,pvga);
+                                              &instrType,pmachine,pvga);
             self.decInstr=decodedInstruction {
-                insType: self.getInstructionType(&opcodeInfo[4].to_string()),
+                insType: instrType,
                 insLen: instrLen,
                 numOperands: opcodeInfo[2].parse::<u8>().unwrap(),
-                instrSize: opcodeInfo[1].parse::<u8>().unwrap(),
+                instrSize: instrWidth,
                 operand1: operandSrc,
                 operand2: operandDst,
                 displacement: displacement,
                 displSize: displSize,
+                u8immediate: u8op,
+                u16immediate: u16op,
                 segOverride: segOverride,
                 repPrefix: repOverride,
-                debugDecode: dbgDec
+                debugDecode: dbgDec,
+                opcode: wideOpcode
             };
         }
 
@@ -679,7 +1114,7 @@ impl x86cpu
         else if self.decInstr.insType==instructionType::instrXchg
         {
             // XCHG reg16,reg16
-            self.xchgRegs(self.decInstr.operand1.clone());
+            self.xchgRegs(self.decInstr.operand1.clone(),self.decInstr.operand2.clone());
             self.ip+=self.decInstr.insLen as u16;
         }
         else if self.decInstr.insType==instructionType::instrPushf
@@ -711,6 +1146,11 @@ impl x86cpu
             // STOSB/STOSW
             self.performStos(pmachine,pvga);
         }
+        else if self.decInstr.insType==instructionType::instrXlat
+        {
+            // XLAT
+            self.performXlat(pmachine,pvga);
+        }
         else if self.decInstr.insType==instructionType::instrJmpShort
         {
             // JE/JNE/etc.
@@ -723,12 +1163,29 @@ impl x86cpu
             pmachine.handleINT(self,intNum,pvga);
             self.ip+=2;
         }
-        else if self.decInstr.insType==instructionType::instrCall
+        else if self.decInstr.insType==instructionType::instrCallRel16
         {
+            // call with 16 bit relative offset
             let offset16=self.decInstr.operand1.parse::<u16>().unwrap();
             pmachine.push16(self.ip+3,self.ss,self.sp);
             self.sp-=2;
             self.ip=self.ip.wrapping_add((offset16+3) as u16);
+        }
+        else if self.decInstr.insType==instructionType::instrCallReg
+        {
+            // call register
+            let addrRel:u16=self.getOperandValue(&self.decInstr.operand1.clone(),pmachine,pvga);
+            pmachine.push16(self.ip+2,self.ss,self.sp);
+            self.sp-=2;
+            self.ip=addrRel;
+        }
+        else if (self.decInstr.insType==instructionType::instrMov) || (self.decInstr.insType==instructionType::instrMovNoModRegRm)
+        {
+            self.performMove(pmachine,pvga);
+        }
+        else if (self.decInstr.insType==instructionType::instrAnd) || (self.decInstr.insType==instructionType::instrAndNoModRegRm)
+        {
+            self.performAnd(pmachine,pvga);
         }
         else
         {
@@ -873,11 +1330,11 @@ impl x86cpu
     fn prepareDbgInfo(&self,cs:u16,ip:u16,pmachine:&mut machine,pvga:&mut vga) -> String
     {
         let mut retStr:String=String::from("");
-        retStr=format!("{:04x}:{:04x}",cs,ip);
+        retStr=format!("{:04x}:{:04x} ",cs,ip);
         for idx in 0..self.decInstr.insLen
         {
             let ibyte:u8=pmachine.readMemory(cs,ip+idx as u16,pvga);
-            retStr.push_str(&format!(" ({:02x})",ibyte));
+            retStr.push_str(&format!("({:02x})",ibyte));
         }
 
         return retStr;
@@ -1130,41 +1587,6 @@ impl x86cpu
 
 
             },        
-            0x20 =>
-            {
-                // AND rmb,rb
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-
-                dbgString.push_str("AND ");
-                dbgString.push_str(&moveVec[0]);
-                dbgString.push_str(",");
-                dbgString.push_str(&moveVec[1]);
-                *bytesRead=2;
-
-                if debugFlag==false
-                {
-                    // TODO flags, other regs
-                    let mut lop:u8=0;
-                    let mut rop:u8=0;
-                    if (moveVec[0]=="AH") && (moveVec[1]=="BL")
-                    {
-                        lop=((self.ax&0xff00)>>8) as u8;
-                        rop=(self.bx&0xff) as u8;
-                        lop&=rop;
-                        self.ax=((lop as u16)<<8)|(self.ax&0xff);
-                    }
-                    else
-                    {
-                        self.abort(&format!("and rmb,rb {} {}",moveVec[0],moveVec[1]));
-                    }
-
-                    self.doZflag(lop as u16);
-                    self.doPflag(lop as u16);
-
-                    self.ip+=2;
-                }
-            },
             0x25 =>
             {
                 // AND AX,iw
@@ -1858,7 +2280,7 @@ impl x86cpu
                 }
                 else
                 {
-                    //self.abort(&format!("unhandled 0x83 reg={}",reg));
+                    self.abort(&format!("unhandled 0x83 reg={}",reg));
                 }
             },
             0x84 =>
@@ -1907,237 +2329,6 @@ impl x86cpu
                     self.ip+=2;
                 }
             },
-            0x88 =>
-            {
-                // MOV rmb,rb
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-
-                dbgString.push_str("MOV ");
-                dbgString.push_str(&moveVec[0]);
-                dbgString.push_str(",");
-                dbgString.push_str(&moveVec[1]);
-                *bytesRead=2;
-                if (moveVec[0].contains("with 8bit")) { *bytesRead+=1; }
-
-                if debugFlag==false
-                {
-                    // TODO all regs
-                    if (moveVec[0]=="AL") && (moveVec[1]=="BH")
-                    {
-                        let bh:u16=(self.bx>>8)&0xff;
-                        self.ax=(self.ax&0xff00)|bh;
-                    }
-                    else if (moveVec[0]=="AL") && (moveVec[1]=="AH")
-                    {
-                        let ah:u16=(self.ax>>8)&0xff;
-                        self.ax=(self.ax&0xff00)|ah;
-                    }
-                    else if (moveVec[0]=="AL") && (moveVec[1]=="BL")
-                    {
-                        let bl:u16=self.bx&0xff;
-                        self.ax=(self.ax&0xff00)|bl;
-                    }
-                    else if (moveVec[0]=="AH") && (moveVec[1]=="BH")
-                    {
-                        let bh:u16=self.bx>>8;
-                        self.ax=(self.ax&0xff)|(bh<<8);
-                    }
-                    else if (moveVec[0]=="AH") && (moveVec[1]=="DL")
-                    {
-                        let dl:u16=self.dx&0xff;
-                        self.ax=(self.ax&0xff)|(dl<<8);
-                    }
-                    else if (moveVec[0]=="AH") && (moveVec[1]=="AL")
-                    {
-                        let al:u16=self.ax&0xff;
-                        self.ax=(self.ax&0xff)|(al<<8);
-                    }
-                    else if (moveVec[0].contains("[SI+Disp] with 8bit")) && (moveVec[1]=="AL")
-                    {
-                        let mut displType:u8=1;
-                        let mut displacement:i32=pmachine.readMemory(theCS,theIP+2,pvga) as i8 as i32;
-                        let mut si=self.si as i32;
-                        si+=displacement;
-                        pmachine.writeMemory(self.ds,si as u16,(self.ax&0xff) as u8,pvga);
-                        self.ip+=1;
-                    }
-                    else
-                    {
-                        self.abort(&format!("0x88 reg combination {} {}",moveVec[0],moveVec[1]));
-                    }
-                    self.ip+=2;
-                }
-            },
-            0x89 =>
-            {
-                // MOV rmw,rw
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-
-                dbgString.push_str("MOV ");
-                if moveVec[0]=="Direct Addr" 
-                { 
-                    let mut data=pmachine.readMemory16(theCS,theIP+2,pvga) as i32;
-                    dbgString.push_str(&format!("[{:04x}]",data)); 
-                }
-                else { dbgString.push_str(&moveVec[0]); }
-                dbgString.push_str(",");
-                dbgString.push_str(&moveVec[1]);
-
-                if moveVec[0]=="Direct Addr" { *bytesRead=4; }
-                else if (moveVec[0].contains("[SI+")) { *bytesRead=3; }
-                else if (moveVec[0].contains("[DI+Disp] with 16bit")) { *bytesRead=4; }
-                else if (moveVec[0].contains("[SI+Disp] with 8bit")) { *bytesRead=3; }
-                else { *bytesRead=2; }
-
-                if debugFlag==false
-                {
-                    if (moveVec[1]=="DX") && (moveVec[0]=="Direct Addr")
-                    {
-                        let mut offset=pmachine.readMemory16(theCS,theIP+2,pvga) as i32;
-                        pmachine.writeMemory16(self.ds,offset as u16,self.dx,pvga);
-                    }
-                    else if (moveVec[0]=="AX") && (moveVec[1]=="DI")
-                    {
-                        self.ax=self.di;
-                    }
-                    else if (moveVec[0]=="[SI]") && (moveVec[1]=="AX")
-                    {
-                        let mut offset=pmachine.readMemory16(self.ds,self.si,pvga);
-                        pmachine.writeMemory16(self.ds,offset as u16,self.ax,pvga);
-                    }
-                    else if (moveVec[0].contains("[SI+")) && (moveVec[1]=="DI")
-                    {
-                        let displacement:i32=pmachine.readMemory(theCS,theIP+2,pvga) as i8 as i32;
-                        let mut si32:i32=self.si as i32;
-                        si32+=displacement;
-                        //*retErr=format!("si+displ is {:04x} displacement is {}",si32,displacement);
-                        pmachine.writeMemory16(self.ds,si32 as u16,self.di,pvga);
-                        self.ip+=1;
-                    }
-                    else if (moveVec[0].contains("[SI+Disp] with 8bit")) && (moveVec[1]=="AX")
-                    {
-                        let displacement:i32=pmachine.readMemory(theCS,theIP+2,pvga) as i8 as i32;
-                        let mut si32:i32=self.si as i32;
-                        si32+=displacement;
-                        *retErr=format!("si+displ is {:04x} displacement is {}",si32,displacement);
-                        pmachine.writeMemory16(self.ds,si32 as u16,self.ax,pvga);
-                        self.ip+=1;
-                    }
-                    else if (moveVec[0].contains("[DI+Disp] with 16bit")) && (moveVec[1]=="AX")
-                    {
-                        let displacement:i32=pmachine.readMemory16(theCS,theIP+2,pvga) as i16 as i32;
-                        let mut di32:i32=self.di as i32;
-                        di32+=displacement;
-                        *retErr=format!("di+displ is {:04x} displacement is {}",di32,displacement);
-                        pmachine.writeMemory16(self.ds,di32 as u16,self.ax,pvga);
-                        self.ip+=2;
-                    }
-                    else
-                    {
-                        self.abort(&format!("unhandled 0x89 {} {}",moveVec[0],moveVec[1]));
-                    }
-
-                    if moveVec[0]=="Direct Addr" { self.ip+=4; }
-                    else { self.ip+=2; }
-                }
-            },
-            0x8b =>
-            {
-                // MOV rw,rmw
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-
-                dbgString.push_str(&format!("MOV {},{}",moveVec[1],moveVec[0])); 
-                *bytesRead+=2;
-
-                if debugFlag==false
-                {
-                    // TODO
-                    if (moveVec[1]=="AX") && (moveVec[0]=="[DI]")
-                    {
-                        let data=pmachine.readMemory16(self.ds,self.di,pvga);
-                        self.ax=data;
-                    }
-                    self.ip+=2;
-                }
-            },
-            0x8e =>
-            {
-                // MOV reg/mem to segreg 
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,1,1);
-
-                dbgString.push_str("MOV ");
-                dbgString.push_str(&moveVec[1]);
-                dbgString.push_str(",");
-                dbgString.push_str(&moveVec[0]);
-                *bytesRead=2;
-
-                if debugFlag==false
-                {
-                    // TODO fully
-                    let mut val:u16=0;
-                    if moveVec[0]=="AX" { val=self.ax; }
-                    if moveVec[1]=="DS" { self.ds=val; }
-                    if moveVec[1]=="ES" { self.es=val; }
-                    self.ip+=2;
-                }
-            },
-            0xa0 =>
-            {
-                // MOV AL,[offset]
-                let offset:u16=pmachine.readMemory16(theCS,theIP+1,pvga);
-
-                dbgString=format!("MOV AL,[{:04x}]",offset);
-                *bytesRead+=3;
-
-                if debugFlag==false
-                {
-                    let data:u8=pmachine.readMemory(self.ds,offset,pvga);
-                    self.ax=(self.ax&0xff00)|(data as u16);
-                    self.ip+=3;
-                }
-            },
-            0xa2 =>
-            {
-                // MOV rmb,AL
-                let offset:u16=pmachine.readMemory16(theCS,theIP+1,pvga);
-
-                if segOverride!="".to_string() { dbgString=format!("{} MOV ",segOverride); }
-                else { dbgString=format!("MOV "); }
-
-                dbgString.push_str(&format!("[{:04x}]",offset)); 
-                dbgString.push_str(",AL");
-                *bytesRead+=3;
-
-                if debugFlag==false
-                {
-                    // TODO other segs override
-                    let mut writeSeg:u16=self.ds;
-                    if segOverride=="CS" { writeSeg=self.cs; }
-
-                    pmachine.writeMemory(writeSeg,offset,(self.ax&0xff) as u8,pvga);
-
-                    self.ip+=3;
-                    if segOverride!="".to_string() { self.ip+=1; }
-                }
-            },
-            0xa3 =>
-            {
-                // MOV rmw,AX
-                let offset:u16=pmachine.readMemory16(theCS,theIP+1,pvga);
-
-                dbgString.push_str(&format!("[{:04x}],AX",offset)); 
-                *bytesRead+=3;
-
-                if debugFlag==false
-                {
-                    pmachine.writeMemory16(self.ds,offset,self.ax,pvga);
-                    self.ip+=3;
-                }
-            },
             0xa8 =>
             {
                 // TEST AL,ib
@@ -2160,89 +2351,6 @@ impl x86cpu
                     else { self.setPflag(false); }
 
                     self.ip+=2;
-                }
-            },
-            0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6 | 0xb7 =>
-            {
-                // MOV 8bit reg,ib
-                let intNum:u16=pmachine.readMemory(theCS,theIP+1,pvga) as u16;
-                let regHashMap = HashMap::from(
-                    [
-                        (0xb0,"AL"),(0xb1,"CL"),(0xb2,"DL"),(0xb3,"BL"),(0xb4,"AH"),(0xb5,"CH"),(0xb6,"DH"),(0xb7,"BH")
-                    ]
-                );
-                dbgString=format!("MOV {},0x{:02x}",regHashMap[&opcode],intNum);
-                *bytesRead=2;
-
-                if debugFlag==false
-                {
-                    if regHashMap[&opcode]=="AL" { self.ax=(self.ax&0xff00)|(intNum&0xff); }
-                    if regHashMap[&opcode]=="CL" { self.cx=(self.cx&0xff00)|(intNum&0xff); }
-                    if regHashMap[&opcode]=="DL" { self.dx=(self.dx&0xff00)|(intNum&0xff); }
-                    if regHashMap[&opcode]=="BL" { self.bx=(self.bx&0xff00)|(intNum&0xff); }
-                    if regHashMap[&opcode]=="AH" { self.ax=(self.ax&0xff)|(intNum<<8); }
-                    if regHashMap[&opcode]=="CH" { self.cx=(self.cx&0xff)|(intNum<<8); }
-                    if regHashMap[&opcode]=="DH" { self.dx=(self.dx&0xff)|(intNum<<8); }
-                    if regHashMap[&opcode]=="BH" { self.bx=(self.bx&0xff)|(intNum<<8); }
-                    self.ip+=2;
-                }
-            },
-            0xbc | 0xb8 | 0xb9 | 0xbe | 0xbf | 0xbb | 0xbd =>
-            {
-                // MOV 16bit reg, immediate data
-                let immediateData=pmachine.readMemory16(theCS,theIP+1,pvga);
-                let regHashMap = HashMap::from(
-                    [
-                        (0xbc,"SP"),(0xb8,"AX"),(0xb9,"CX"),(0xbe,"SI"),(0xbf,"DI"),(0xbb,"BX"),(0xbd,"BP")
-                    ]
-                );
-
-                dbgString=format!("MOV {},0x{:04x}",regHashMap[&opcode],immediateData);
-                *bytesRead=3;
-
-                if debugFlag==false
-                {
-                    if opcode==0xbc { self.sp=immediateData; }
-                    else if opcode==0xb8 { self.ax=immediateData; }
-                    else if opcode==0xb9 { self.cx=immediateData; }
-                    else if opcode==0xbe { self.si=immediateData; }
-                    else if opcode==0xbf { self.di=immediateData; }
-                    else if opcode==0xbb { self.bx=immediateData; }
-                    else if opcode==0xbd { self.bp=immediateData; }
-
-                    self.ip+=3;
-                }
-            },
-            0xc6 =>
-            {
-                // MOV rmb,ib
-                let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-                let ib:u8=pmachine.readMemory(theCS,theIP+3,pvga);
-
-                dbgString.push_str("MOV ");
-                dbgString.push_str(&moveVec[0]);
-                dbgString.push_str(",");
-                dbgString.push_str(&format!("0x{:02x}",ib));
-                *bytesRead=3;
-                if (moveVec[0].contains("with 8bit")) { *bytesRead+=1; }
-
-                if debugFlag==false
-                {
-                    // TODO all regs
-                    if moveVec[0].contains("[SI+Disp] with 8bit")
-                    {
-                        let mut displType:u8=1;
-                        let mut displacement:i16=pmachine.readMemory(theCS,theIP+2,pvga) as i8 as i16;
-                        let mut si=self.si as i16;
-                        si+=displacement;
-
-                        //*retErr=format!("si+displ is {:04x} displacement is {}",si,displacement);
-
-                        pmachine.writeMemory(self.ds,si as u16,ib,pvga);
-                        self.ip+=1;
-                    }
-                    self.ip+=3;
                 }
             },
             0xd0 =>
@@ -2374,27 +2482,6 @@ impl x86cpu
                     }
                 }
             },
-            0xd7 =>
-            {
-                // XLAT
-                if segOverride!="".to_string() { dbgString=format!("{} XLAT",segOverride); }
-                else { dbgString=format!("XLAT"); }
-
-                *bytesRead+=1;
-
-                if debugFlag==false
-                {
-                    // TODO other segs
-                    let mut segment=self.ds;
-                    if segOverride=="CS" { segment=self.cs; }
-                    let al=self.ax&0xff;
-                    let tableval:u16=pmachine.readMemory(segment,self.bx+al,pvga) as u16;
-                    self.ax=(self.ax&0xff00)|tableval;
-                    
-                    self.ip+=1;
-                    if segOverride!="".to_string() { self.ip+=1; }
-                }
-            },
             0xf6 =>
             {
                 let instrType=pmachine.readMemory(theCS,theIP+1,pvga);
@@ -2422,6 +2509,10 @@ impl x86cpu
                             val2compare=(self.bx&0xff) as i16;
                             i16ib=ib as i16;
                         }
+                        else
+                        {
+                            self.abort("Unhandled TEST rmb,ib");
+                        }
     
                         let cmpval:i16=(val2compare&i16ib) as i16;
                         self.doZflag(cmpval as u16);
@@ -2429,6 +2520,40 @@ impl x86cpu
     
                         self.ip+=3;
                     }
+                }
+                else if (reg==6)
+                {
+                    // DIV rmb
+                    let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
+                    let regVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
+                    dbgString=format!("DIV {}",regVec[0]);
+                    *bytesRead=2;
+    
+                    if debugFlag==false
+                    {
+                        // TODO other regs, flags
+                        if regVec[0]=="CL"
+                        {
+                            let val2divide:u32=self.ax as u32;
+                            let modulo=val2divide%((self.cx&0xff) as u32);
+                            let quotient=val2divide/((self.cx&0xff) as u32);
+                            self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
+
+                            self.doZflag(quotient as u16);
+                            //self.doPflag(quotient as u16); // todo check p flag
+                        }
+                        else
+                        {
+                            self.abort(&format!("Unhandled DIV {}",regVec[0]));
+                        }
+
+                        self.ip+=2;
+                    }
+
+                }
+                else
+                {
+                    self.abort("0xf6");
                 }
             },
             0xf7 =>
@@ -2459,6 +2584,11 @@ impl x86cpu
                             self.doSflag(self.bx,16);
                             self.doPflag(self.bx);
                         }
+                        else
+                        {
+                            self.abort("Unhandled NEG rmw");
+                        }
+
                         self.ip+=2;
                     }
                 }
@@ -2487,6 +2617,11 @@ impl x86cpu
                             self.doZflag(quotient as u16);
                             //self.doPflag(quotient as u16); // todo check p flag
                         }
+                        else
+                        {
+                            self.abort("Unhandled DIV rmw");
+                        }
+
                         self.ip+=2;
                     }
                 }
@@ -2513,6 +2648,10 @@ impl x86cpu
                             ah+=1;
                             self.ax=(self.ax&0xff)|(ah<<8);
                         }
+                        else
+                        {
+                            self.abort("Unhandled INC rmb");
+                        }
                         self.ip+=2;
                     }
                 }
@@ -2536,36 +2675,23 @@ impl x86cpu
                             val-=1;
                             pmachine.writeMemory(self.ds,addr,val,pvga);
                         }
+                        else if regVec[0]=="AH"
+                        {
+                            let mut val:u16=self.ax>>8;
+                            val-=1;
+                            val&=0xff;
+                            self.ax=(self.ax&0xff)|(val<<8);
+                        }
+                        else
+                        {
+                            self.abort("Unhandled DEC rmb");
+                        }
                         self.ip+=2;
                     }
                 }
                 else
                 {
                     self.abort(&format!("Unhandled 0xfe reg={}",reg));
-                }
-            },
-            0xff =>
-            {
-                let instrType=pmachine.readMemory(theCS,theIP+1,pvga);
-                let reg:usize=((instrType>>3)&0x07).into();
-
-                if (reg==2)
-                {
-                    // CALL rw
-                    let addressingModeByte=pmachine.readMemory(theCS,theIP+1,pvga);
-                    let regVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,0,opcode&1);
-
-                    dbgString=format!("CALL {}",regVec[0]);
-                    *bytesRead=2;
-    
-                    let mut addrRel:u16=0;
-                    if regVec[0]=="BP" { addrRel=self.bp; }
-                    if debugFlag==false
-                    {
-                        pmachine.push16(self.ip+2,self.ss,self.sp);
-                        self.sp-=2;
-                        self.ip=addrRel;
-                    }
                 }
             },
             _ =>

@@ -12,12 +12,12 @@ mod machine;
 mod x86cpu;
 mod guiif;
 
-
 fn main()
 {
     let mut theVGA=vga::vga::new();
     let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
     let mut theCPU=x86cpu::x86cpu::new();
 
@@ -73,7 +73,7 @@ fn main()
         else if act==guiif::keyAction::actionRunToAddr
         {
             let mut bytesRead=1;
-            while theCPU.ip!=0x190
+            while theCPU.ip!=0x13d
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
                 theMachine.update();
