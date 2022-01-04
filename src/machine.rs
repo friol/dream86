@@ -5,6 +5,7 @@ use std::io;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use rand::Rng;
 
 use crate::vga::vga;
 use crate::x86cpu::x86cpu;
@@ -155,7 +156,8 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr|(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff)
+        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) ||
+           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             // VGA framebuffer
             return pvga.readMemory(flatAddr);
@@ -170,7 +172,8 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr|(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff)
+        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
+           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             return pvga.readMemory16(flatAddr);
         }
@@ -184,7 +187,8 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr|(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff)
+        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
+           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             // VGA framebuffer
             pvga.writeMemory(flatAddr,val);
@@ -201,7 +205,8 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr|(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff)
+        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
+           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             // VGA framebuffer
             /*if flatAddr==0xae628
@@ -229,7 +234,8 @@ impl machine
         let mut machineRAM:Vec<u8>=Vec::with_capacity(ramSize);
         for i in 0..ramSize
         {
-            machineRAM.push(0);
+            let num = rand::thread_rng().gen_range(0..256);
+            machineRAM.push(num as u8);
         }
 
         //Self::loadBIOS(&mut machineRAM,"./bios/bios_cga");

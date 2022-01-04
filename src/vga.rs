@@ -3,7 +3,8 @@
 pub struct vga
 {
     pub mode: u16,
-    pub framebuffer: Vec<u8>
+    pub framebuffer: Vec<u8>,
+    pub cgaFramebuffer: Vec<u8>
 }
 
 impl vga
@@ -19,7 +20,26 @@ impl vga
                 self.framebuffer[idx]=0;
             }
         }
+        else if videomodeNum==0x04
+        {
+            // CGA 320x200 4 colours            
+            self.mode=0x04;
+            for idx in 0..self.cgaFramebuffer.len()
+            {
+                if idx<(80*400)
+                {
+                    self.cgaFramebuffer[idx]=0;
+                }
+                else
+                {
+                    if (idx%2)==0 { self.cgaFramebuffer[idx]=0x07; }
+                    else { self.cgaFramebuffer[idx]=0x20; }
+                }
+            }
+        }
     }
+
+    //
 
     pub fn readMemory(&self,addr:i64) -> u8
     {
@@ -27,41 +47,45 @@ impl vga
         {
             return self.framebuffer[(addr-0xa0000) as usize];
         }
+        else if (addr>=0xb8000) && (addr<=0xbffff)
+        {
+            //return self.cgaFramebuffer[(addr-0xb8000) as usize];
+            if (addr%2)==0 { return 0x20; }
+            else { return 0x07; }
+        }
 
         return 0;
     }
 
     pub fn readMemory16(&self,addr:i64) -> u16
     {
-        if (addr>=0xa0000) && (addr<=(0xaffff))
-        {
-            let lobyte=self.framebuffer[(addr-0xa0000) as usize] as u16;
-            let hibyte=self.framebuffer[(addr+1-0xa0000) as usize] as u16;
-            return lobyte|(hibyte<<8);
-        }
-
-        return 0;
+        let lobyte=self.readMemory(addr) as u16;
+        let hibyte=self.readMemory(addr+1) as u16;;
+        return lobyte|(hibyte<<8);
     }
 
     pub fn writeMemory(&mut self,addr:i64,val:u8)
     {
-        if (addr>=0xa0000) && (addr<=(0xaffff))
+        if (addr>=0xa0000) && (addr<=0xaffff)
         {
             self.framebuffer[(addr-0xa0000) as usize]=val;
+        }
+        else if (addr>=0xb8000) && (addr<=0xbffff)
+        {
+            self.cgaFramebuffer[(addr-0xb8000) as usize]=val;
         }
     }
 
     pub fn writeMemory16(&mut self,addr:i64,val:u16)
     {
-        if (addr>=0xa0000) && (addr<=(0xaffff))
-        {
-            self.framebuffer[(addr-0xa0000) as usize]=(val&0xff) as u8;
-            self.framebuffer[(addr+1-0xa0000) as usize]=(val>>8) as u8;
-        }
+        self.writeMemory(addr,(val&0xff) as u8);
+        self.writeMemory(addr+1,(val>>8) as u8);
     }
 
     pub fn fbTobuf32(&self,buf32:&mut Vec<u32>)
     {
+        let cgaPalette = Vec::from([0x000000,0xff55ff,0x55ffff,0xffffff]);
+
         let vgaPalette = Vec::from(
             [
                 0x000000,0x0000aa,0x00aa00,
@@ -131,29 +155,64 @@ impl vga
                 0x000000,                0x000000,                0x000000,                0x000000
                 ]
         );
-        
-        let mut idx:usize=0;
-        for i in buf32.iter_mut() 
+
+        if self.mode==0x13
         {
-            let bufVal=self.framebuffer[idx];
-            *i = vgaPalette[bufVal as usize];
-            idx+=1;
-        }        
+            let mut idx:usize=0;
+            for i in buf32.iter_mut() 
+            {
+                let bufVal=self.framebuffer[idx];
+                *i = vgaPalette[bufVal as usize];
+                idx+=1;
+            }        
+        }
+        else if self.mode==0x04
+        {
+            let mut adder=0;
+            let mut currow=0;
+            let mut curbyte=0;
+            let mut fbidx=0;
+            let mut shifter=6;
+            for pix in buf32.iter_mut()
+            {
+                let theByte=self.cgaFramebuffer[adder+fbidx];
+                let b0:usize=((theByte>>shifter)&0x03) as usize;
+                if adder==0 { *pix=cgaPalette[b0]; }
+                shifter-=2;
+
+                if shifter<0
+                {
+                    shifter=6;
+                    if adder==0 { fbidx+=1; }
+                    curbyte+=1;
+                    if curbyte==80
+                    {
+                        curbyte=0;                        
+                        currow+=1;
+                        if (currow%2)==0 { adder=0; }
+                        else { adder=0x2000; }
+                    }
+                }
+            }
+        }
     }
 
     pub fn new() -> Self 
     {
-        let fbSize=65536; // we assume VGA RAM is 64k
+        let fbSize=65536; // 64k?
         let mut vgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
+        let mut cgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         for i in 0..fbSize
         {
             vgaFramebuf.push(0);
+            cgaFramebuf.push(0);
         }
 
         vga
         {
             mode: 0,
-            framebuffer: vgaFramebuf
+            framebuffer: vgaFramebuf,
+            cgaFramebuffer: cgaFramebuf
         }
     }
 

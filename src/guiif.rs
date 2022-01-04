@@ -271,7 +271,7 @@ impl guiif
         stdout.flush();
     }
 
-    pub fn drawMemory(&self,pvga:&vga,startSegment:u16,startOffset:u16,numBytes:u16)
+    pub fn drawMemory(&self,pvga:&vga,pmachine:&machine,startSegment:u16,startOffset:u16,numBytes:u16)
     {
         let mut varOffset:i64=startOffset.into();
         let mut stdout = stdout();
@@ -294,7 +294,7 @@ impl guiif
                 let i64seg:i64=startSegment.into();
                 let i64addr:i64=varOffset;
                 let flatAddr:i64=i64addr|(i64seg*16);
-                let ss:String=format!(" {:02x}",pvga.readMemory(flatAddr));
+                let ss:String=format!(" {:02x}",pmachine.readMemory(startSegment,varOffset as u16,pvga));
                 stdout.queue(style::PrintStyledContent(ss.to_string().white()));
                 varOffset+=1;
             }
