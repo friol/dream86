@@ -15,9 +15,9 @@ fn main()
 {
     let mut theVGA=vga::vga::new();
     //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
-    let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
     let mut theCPU=x86cpu::x86cpu::new();
@@ -31,7 +31,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
-        theGUI.drawMemory(&theVGA,&theMachine,0xb800,0x7c34,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0xf000,0xfa00,80);
         theGUI.printDebugErr(errStr.clone());
         theVGA.fbTobuf32(&mut theGUI.frameBuffer);
         theGUI.updateVideoWindow();
@@ -74,7 +74,8 @@ fn main()
         else if act==guiif::keyAction::actionRunToAddr
         {
             let mut bytesRead=1;
-            while theCPU.ip!=0x140
+            //while theCPU.ip!=0x201
+            while theCPU.ip!=0x1e9
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
                 theMachine.update();

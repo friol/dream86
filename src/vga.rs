@@ -26,6 +26,7 @@ impl vga
             self.mode=0x04;
             for idx in 0..self.cgaFramebuffer.len()
             {
+                // CGA init pattern (?)
                 if idx<(80*400)
                 {
                     self.cgaFramebuffer[idx]=0;
@@ -49,9 +50,7 @@ impl vga
         }
         else if (addr>=0xb8000) && (addr<=0xbffff)
         {
-            //return self.cgaFramebuffer[(addr-0xb8000) as usize];
-            if (addr%2)==0 { return 0x20; }
-            else { return 0x07; }
+            return self.cgaFramebuffer[(addr-0xb8000) as usize];
         }
 
         return 0;
@@ -173,6 +172,8 @@ impl vga
             let mut curbyte=0;
             let mut fbidx=0;
             let mut shifter=6;
+
+            // even rows
             for pix in buf32.iter_mut()
             {
                 let theByte=self.cgaFramebuffer[adder+fbidx];
@@ -184,6 +185,35 @@ impl vga
                 {
                     shifter=6;
                     if adder==0 { fbidx+=1; }
+                    curbyte+=1;
+                    if curbyte==80
+                    {
+                        curbyte=0;                        
+                        currow+=1;
+                        if (currow%2)==0 { adder=0; }
+                        else { adder=0x2000; }
+                    }
+                }
+            }
+
+            adder=0;
+            currow=0;
+            curbyte=0;
+            fbidx=0;
+            shifter=6;
+
+            // odd rows
+            for pix in buf32.iter_mut()
+            {
+                let theByte=self.cgaFramebuffer[adder+fbidx];
+                let b0:usize=((theByte>>shifter)&0x03) as usize;
+                if adder==0x2000 { *pix=cgaPalette[b0]; }
+                shifter-=2;
+
+                if shifter<0
+                {
+                    shifter=6;
+                    if adder==0x2000 { fbidx+=1; }
                     curbyte+=1;
                     if curbyte==80
                     {
