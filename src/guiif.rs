@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::io::{stdout, Write};
-use crossterm::{ExecutableCommand, QueueableCommand,terminal, cursor, style::{self, Stylize}, Result};
+use crossterm::{ExecutableCommand, QueueableCommand,terminal, cursor, style::{self, Stylize}};
 use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
 
 extern crate minifb;
@@ -44,7 +44,7 @@ impl guiif
     pub fn new() -> Self 
     {
         let mut stdout = stdout();
-        stdout.execute(terminal::Clear(terminal::ClearType::All));
+        stdout.execute(terminal::Clear(terminal::ClearType::All)).ok();
 
         let mut window = Window::new("dream86 v0.0.4",320,200,WindowOptions {
             scale: Scale::X2,
@@ -165,8 +165,8 @@ impl guiif
     pub fn clearScreen(&self)
     {
         let mut stdout = stdout();
-        stdout.execute(terminal::Clear(terminal::ClearType::All));
-        stdout.queue(cursor::MoveTo(0,0));
+        stdout.execute(terminal::Clear(terminal::ClearType::All)).ok();
+        stdout.queue(cursor::MoveTo(0,0)).ok();
     }
 
     pub fn drawInstructions(&self,instrs:&Vec<String>)
@@ -175,20 +175,20 @@ impl guiif
         let mut stdout = stdout();
         for idx in 0..instrs.len()
         {
-            stdout.queue(cursor::MoveTo(5,ypos));
-            if idx==0 { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white().negative())); }
-            else { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white())); }
+            stdout.queue(cursor::MoveTo(5,ypos)).ok();
+            if idx==0 { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white().negative())).ok(); }
+            else { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white())).ok(); }
             ypos+=1;
         }
-        stdout.flush();
+        stdout.flush().ok();
     }
 
     pub fn printDebugErr(&self,err:String)
     {
         let mut stdout = stdout();
-        stdout.queue(cursor::MoveTo(0,0));
-        stdout.queue(style::PrintStyledContent(err.clone().white()));
-        stdout.flush();
+        stdout.queue(cursor::MoveTo(0,0)).ok();
+        stdout.queue(style::PrintStyledContent(err.clone().white())).ok();
+        stdout.flush().ok();
     }
 
     pub fn drawDebugArea(&mut self,theMachine:&mut machine,theVGA:&mut vga,theCPU:&mut x86cpu)
@@ -200,9 +200,9 @@ impl guiif
         let mut ii=0;
         for el in &theMachine.stackey
         {
-            stdout.queue(cursor::MoveTo(80,ii));
+            stdout.queue(cursor::MoveTo(80,ii)).ok();
             let ss:String=format!("{:02x}",el);
-            stdout.queue(style::PrintStyledContent(ss.to_string().white()));
+            stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
             ii+=1;
         }
 
@@ -228,8 +228,8 @@ impl guiif
         }
 
         // draw pointer
-        stdout.queue(cursor::MoveTo(0,self.dbgInstrLine+self.dbgCursorLine));
-        stdout.queue(style::PrintStyledContent("==> ".white()));
+        stdout.queue(cursor::MoveTo(0,self.dbgInstrLine+self.dbgCursorLine)).ok();
+        stdout.queue(style::PrintStyledContent("==> ".white())).ok();
 
         // instrs.
         self.drawInstructions(&listOfInstructions);
@@ -251,24 +251,24 @@ impl guiif
 
         let mut stdout = stdout();
 
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline));
-        stdout.queue(style::PrintStyledContent("Registers                                                      ".blue().negative()));
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline+1));
-        stdout.queue(style::PrintStyledContent(strReg.white()));
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline+2));
-        stdout.queue(style::PrintStyledContent(strReg2.white()));
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline)).ok();
+        stdout.queue(style::PrintStyledContent("Registers                                                      ".blue().negative())).ok();
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline+1)).ok();
+        stdout.queue(style::PrintStyledContent(strReg.white())).ok();
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline+2)).ok();
+        stdout.queue(style::PrintStyledContent(strReg2.white())).ok();
 
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline+4));
-        stdout.queue(style::PrintStyledContent("Flags                                                          ".blue().negative()));
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline+5));
-        stdout.queue(style::PrintStyledContent("XXXXODITSZXAXPXC".white()));
-        stdout.queue(cursor::MoveTo(0,self.dbgRegline+6));
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline+4)).ok();
+        stdout.queue(style::PrintStyledContent("Flags                                                          ".blue().negative())).ok();
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline+5)).ok();
+        stdout.queue(style::PrintStyledContent("XXXXODITSZXAXPXC".white())).ok();
+        stdout.queue(cursor::MoveTo(0,self.dbgRegline+6)).ok();
         let mut flagsReg:String=String::from("");
         flagsReg.push_str(&format!("{:016b}",flags));
-        stdout.queue(style::PrintStyledContent(flagsReg.white()));
+        stdout.queue(style::PrintStyledContent(flagsReg.white())).ok();
 
-        stdout.queue(cursor::MoveTo(0,24));
-        stdout.flush();
+        stdout.queue(cursor::MoveTo(0,24)).ok();
+        stdout.flush().ok();
     }
 
     pub fn drawMemory(&self,pvga:&vga,pmachine:&machine,startSegment:u16,startOffset:u16,numBytes:u16)
@@ -276,26 +276,23 @@ impl guiif
         let mut varOffset:i64=startOffset.into();
         let mut stdout = stdout();
 
-        stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine));
-        stdout.queue(style::PrintStyledContent("Memory                                                          ".blue().negative()));
+        stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine)).ok();
+        stdout.queue(style::PrintStyledContent("Memory                                                          ".blue().negative())).ok();
 
         for idx in 0..numBytes
         {
             if ((idx*4)%(20*4))==0
             {
                 // print address
-                stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine+1+(idx/20)));
+                stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine+1+(idx/20))).ok();
                 let ss:String=format!("{:04x}:{:04x}",startSegment,varOffset as u16);
-                stdout.queue(style::PrintStyledContent(ss.to_string().white()));
+                stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
             }
             else
             {
-                stdout.queue(cursor::MoveTo(9+((idx*4)%(20*4)),self.dbgMemoryLine+1+(idx/20)));
-                let i64seg:i64=startSegment.into();
-                let i64addr:i64=varOffset;
-                let flatAddr:i64=i64addr|(i64seg*16);
+                stdout.queue(cursor::MoveTo(9+((idx*4)%(20*4)),self.dbgMemoryLine+1+(idx/20))).ok();
                 let ss:String=format!(" {:02x}",pmachine.readMemory(startSegment,varOffset as u16,pvga));
-                stdout.queue(style::PrintStyledContent(ss.to_string().white()));
+                stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
                 varOffset+=1;
             }
 

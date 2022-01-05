@@ -60,7 +60,7 @@ impl vga
     pub fn readMemory16(&self,addr:i64) -> u16
     {
         let lobyte=self.readMemory(addr) as u16;
-        let hibyte=self.readMemory(addr+1) as u16;;
+        let hibyte=self.readMemory(addr+1) as u16;
         return lobyte|(hibyte<<8);
     }
 
@@ -202,7 +202,7 @@ impl vga
         let fbSize=65536; // 64k?
         let mut vgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         let mut cgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
-        for i in 0..fbSize
+        for _i in 0..fbSize
         {
             vgaFramebuf.push(0);
             cgaFramebuf.push(0);

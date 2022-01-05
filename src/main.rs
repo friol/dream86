@@ -3,9 +3,8 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use std::process;
-use std::{thread, time};
-use std::collections::HashMap;
+//use std::process;
+//use std::{thread, time};
 
 mod vga;
 mod machine;
@@ -15,6 +14,7 @@ mod guiif;
 fn main()
 {
     let mut theVGA=vga::vga::new();
+    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
     let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
@@ -74,7 +74,7 @@ fn main()
         else if act==guiif::keyAction::actionRunToAddr
         {
             let mut bytesRead=1;
-            while theCPU.ip!=0x26d
+            while theCPU.ip!=0x140
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
                 theMachine.update();

@@ -1,9 +1,7 @@
 /* dream86 - machine 2o22 */
 
-use std::process;
-use std::io;
+//use std::io;
 use std::fs::File;
-use std::fs::OpenOptions;
 use std::io::prelude::*;
 use rand::Rng;
 
@@ -20,20 +18,21 @@ pub struct machine
 
 impl machine 
 {
-    /*fn debugLog(s:&str)
-    {
-        println!("{}",s);
-    }*/
-
-    fn loadBIOS(mem:&mut Vec<u8>,fname:&str)
+    /*fn loadBIOS(mem:&mut Vec<u8>,fname:&str)
     {
         // Load BIOS image into F000:0100
         let biosBase:usize=0xF0100;
         
-        let mut f = File::open(fname).unwrap();
+        let mut f = match File::open(fname) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Unable to open file {}",fname);
+                return;
+            }
+        };
         let biosLen:usize=f.metadata().unwrap().len() as usize;
         let mut data = Vec::new();
-        f.read_to_end(&mut data);        
+        f.read_to_end(&mut data).ok();        
 
         //println!("BIOS \"{}\" len is {}",fname,biosLen);
 
@@ -41,17 +40,23 @@ impl machine
         {
             mem[biosBase+i]=data[i];
         }
-    }
+    }*/
 
     fn loadCOMFile(mem:&mut Vec<u8>,fname:&str)
     {
         // Load .com image into F000:0100
         let comBase:usize=0xF0100;
         
-        let mut f = File::open(fname).unwrap();
+        let mut f = match File::open(fname) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Unable to open file {} error:{}",fname,e);
+                return;
+            }
+        };
         let comLen:usize=f.metadata().unwrap().len() as usize;
         let mut data = Vec::new();
-        f.read_to_end(&mut data);        
+        f.read_to_end(&mut data).ok();        
 
         for i in 0..comLen
         {
@@ -232,7 +237,7 @@ impl machine
     pub fn new(comFullPath:&str,ramSize:usize) -> Self 
     {
         let mut machineRAM:Vec<u8>=Vec::with_capacity(ramSize);
-        for i in 0..ramSize
+        for _i in 0..ramSize
         {
             let num = rand::thread_rng().gen_range(0..256);
             machineRAM.push(num as u8);
