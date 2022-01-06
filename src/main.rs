@@ -1,4 +1,4 @@
-/* dream86 - 2o22 - v0.4 */
+/* dream86 - 2o22 */
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
@@ -14,10 +14,10 @@ mod guiif;
 fn main()
 {
     let mut theVGA=vga::vga::new();
-    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
-    let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
     let mut theCPU=x86cpu::x86cpu::new();
@@ -75,7 +75,7 @@ fn main()
         {
             let mut bytesRead=1;
             //while theCPU.ip!=0x201
-            while theCPU.ip!=0x1e9
+            while theCPU.ip!=0x274
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
                 theMachine.update();
@@ -115,7 +115,7 @@ fn main()
                     bailOut=true;
                 }
 
-                if inum>3000
+                if inum>6000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);

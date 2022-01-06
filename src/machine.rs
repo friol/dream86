@@ -120,6 +120,22 @@ impl machine
                     pcpu.ax=(scanCode as u16)<<8;
                 }
             }
+            // AH=2 - read keyboard flags
+            else if (pcpu.ax&0xff00)==0x0200
+            {
+                /*
+                |7|6|5|4|3|2|1|0|  AL or BIOS Data Area 40:17
+                | | | | | | | `---- right shift key depressed
+                | | | | | | `----- left shift key depressed
+                | | | | | `------ CTRL key depressed
+                | | | | `------- ALT key depressed
+                | | | `-------- scroll-lock is active
+                | | `--------- num-lock is active
+                | `---------- caps-lock is active
+                `----------- insert is active                
+                */
+                pcpu.ax=(pcpu.ax&0xff00)|0x00;
+            }
         }
     }
 
