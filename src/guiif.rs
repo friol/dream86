@@ -144,8 +144,7 @@ impl guiif
         let mut idx=0;
         while (bytesRead!=0) && (idx<NUM_INSTRUCTIONS)
         {
-            let mut errStr:String=String::from("");
-            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp,&mut errStr);
+            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp);
             if bytesRead!=0
             {
                 listOfInstructions.push(instr);
@@ -183,13 +182,13 @@ impl guiif
         stdout.flush().ok();
     }
 
-    pub fn printDebugErr(&self,err:String)
+    /*pub fn printDebugErr(&self,err:String)
     {
         let mut stdout = stdout();
         stdout.queue(cursor::MoveTo(0,0)).ok();
         stdout.queue(style::PrintStyledContent(err.clone().white())).ok();
         stdout.flush().ok();
-    }
+    }*/
 
     pub fn drawDebugArea(&mut self,theMachine:&mut machine,theVGA:&mut vga,theCPU:&mut x86cpu)
     {
@@ -216,8 +215,7 @@ impl guiif
         let mut idx=0;
         while (bytesRead!=0) && (idx<NUM_INSTRUCTIONS)
         {
-            let mut errStr:String=String::from("");
-            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp,&mut errStr);
+            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp);
             if bytesRead!=0
             {
                 listOfInstructions.push(instr);

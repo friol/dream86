@@ -24,7 +24,6 @@ fn main()
 
     let mut theGUI=guiif::guiif::new();
 
-    let mut errStr:String=String::from("");
     let mut goOut=false;
     while !goOut
     {
@@ -32,7 +31,6 @@ fn main()
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
         theGUI.drawMemory(&theVGA,&theMachine,0xf000,0xfa00,80);
-        theGUI.printDebugErr(errStr.clone());
         theVGA.fbTobuf32(&mut theGUI.frameBuffer);
         theGUI.updateVideoWindow();
 
@@ -46,7 +44,7 @@ fn main()
         else if act==guiif::keyAction::actionStep
         {
             let mut bytesRead=0;
-            theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
+            theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
             theMachine.update();
         }
         else if act==guiif::keyAction::actionRunToRet
@@ -56,8 +54,7 @@ fn main()
             let mut iterations:u64=0;
             while (bytesRead!=0) && (!dbgstr.contains("RET"))
             {
-                let mut errStr:String=String::from("");
-                dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
+                dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
                 theMachine.update();
 
                 if (iterations%1000)==0
@@ -77,7 +74,7 @@ fn main()
             //while theCPU.ip!=0x201
             while theCPU.ip!=0x274
             {
-                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
+                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
                 theMachine.update();
             }
         }
@@ -95,7 +92,7 @@ fn main()
             let bpPos:u16=theGUI.getRuntoIp(&mut theCPU,&mut theMachine,&mut theVGA);
             while theCPU.ip!=bpPos
             {
-                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
+                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
                 theMachine.update();
             }
         }
@@ -106,7 +103,7 @@ fn main()
             let mut bailOut=false;
             while !bailOut
             {
-                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0,&mut errStr);
+                theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
                 theMachine.update();
                 inum+=1;
 
@@ -121,7 +118,6 @@ fn main()
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
                     theGUI.drawMemory(&theVGA,&theMachine,0xa000,0xe626,80);
-                    theGUI.printDebugErr(errStr.clone());
                     theVGA.fbTobuf32(&mut theGUI.frameBuffer);
                     theGUI.updateVideoWindow();
 
