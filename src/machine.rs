@@ -1,9 +1,9 @@
 /* dream86 - machine 2o22 */
 
-//use std::io;
 use std::fs::File;
 use std::io::prelude::*;
 use rand::Rng;
+use std::process;
 
 use crate::vga::vga;
 use crate::x86cpu::x86cpu;
@@ -18,14 +18,14 @@ pub struct machine
 
 impl machine 
 {
-    /*fn loadBIOS(mem:&mut Vec<u8>,fname:&str)
+    fn loadBIOS(mem:&mut Vec<u8>,fname:&str)
     {
         // Load BIOS image into F000:0100
         let biosBase:usize=0xF0100;
         
         let mut f = match File::open(fname) {
             Ok(f) => f,
-            Err(e) => {
+            Err(_e) => {
                 println!("Unable to open file {}",fname);
                 return;
             }
@@ -40,12 +40,13 @@ impl machine
         {
             mem[biosBase+i]=data[i];
         }
-    }*/
+    }
 
     fn loadCOMFile(mem:&mut Vec<u8>,fname:&str)
     {
         // Load .com image into F000:0100
         let comBase:usize=0xF0100;
+        //let comBase:usize=0x8130;
         
         let mut f = match File::open(fname) {
             Ok(f) => f,
@@ -88,6 +89,34 @@ impl machine
                 pcpu.ax&=0xff00; // midnight flag 0 in AL
                 pcpu.cx=((self.clockTicker&0xffff0000)>>16) as u16;
                 pcpu.dx=(self.clockTicker&0xffff) as u16;
+            }
+        }
+        else if intNum==0x21
+        {
+            // AH=0x4c - exit to DOS
+            if (pcpu.ax&0xff00)==0x4c00
+            {
+                println!("Program terminated by int 21h");
+                process::exit(0x0);
+            }
+            // AH=0x09 - print string to stdout
+            if (pcpu.ax&0xff00)==0x0900
+            {
+                let mut stringVec:Vec<u8>=Vec::new();
+                let mut curIdx=pcpu.dx;
+
+                let mut b=self.readMemory(pcpu.ds,curIdx,pvga);
+                while (b as char).to_string()!="$"
+                {
+                    stringVec.push(b);
+                    curIdx+=1;
+                    b=self.readMemory(pcpu.ds,curIdx,pvga);
+                }
+
+                for ch in stringVec
+                {
+                    pvga.outputCharToStdout(ch);
+                }
             }
         }
         else if intNum==0x16
@@ -134,7 +163,22 @@ impl machine
                 | `---------- caps-lock is active
                 `----------- insert is active                
                 */
-                pcpu.ax=(pcpu.ax&0xff00)|0x00;
+
+                let mut al=0;
+                if self.keyboardQueue.len()==0
+                {
+                    pcpu.ax=0xff00;   
+                }
+                else
+                {
+                    let scanCode:u8=self.keyboardQueue[self.keyboardQueue.len()-1];
+                    if scanCode==0xff
+                    {
+                        al|=2;
+                        self.keyboardQueue.pop();
+                    }
+                    pcpu.ax=0xff00|al;
+                }
             }
         }
     }

@@ -1,13 +1,12 @@
 /* gui interface - dream86 */
 
-
 use std::collections::HashMap;
 use std::io::{stdout, Write};
 use crossterm::{ExecutableCommand, QueueableCommand,terminal, cursor, style::{self, Stylize}};
 use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
 
 extern crate minifb;
-use minifb::{Key, Scale, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions};
 
 use crate::machine::machine;
 use crate::x86cpu::x86cpu;
@@ -36,47 +35,55 @@ pub struct guiif
     pub dbgRegline: u16,
     pub dbgMemoryLine: u16,
     pub frameBuffer: Vec<u32>,
-    pub videoWindow: Window
+    pub videoWindow: Window,
+    pub videoWinWidth: u32,
+    pub videoWinHeight: u32
 }
 
 impl guiif
 {
-    pub fn new() -> Self 
+    pub fn new(videomode:&u8,inCS:u16,inIP:u16) -> Self 
     {
         let mut stdout = stdout();
         stdout.execute(terminal::Clear(terminal::ClearType::All)).ok();
 
-        let mut window = Window::new("dream86 v0.0.4",320,200,WindowOptions {
-            scale: Scale::X2,
+        let mut window:Window;
+        let mut vwidth:u32=0;
+        let mut vheight:u32=0;
+        
+        if *videomode==0x13 { vwidth=320; vheight=200; }
+        else if *videomode==0x02 { vwidth=720; vheight=400; }
+
+        window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
+            /*scale: Scale::X2,*/
             ..WindowOptions::default()
         }).unwrap_or_else(|e| { panic!("{}", e); });    
 
-        //window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));        
-
-        let mut buffer: Vec<u32> = vec![0; 320*200];
-
+        let mut buffer: Vec<u32> = vec![0; (vwidth as usize)*(vheight as usize)];
         for i in buffer.iter_mut() 
         {
             *i = 0;
         }
-        window.update_with_buffer(&buffer,320,200).unwrap();
+        window.update_with_buffer(&buffer,vwidth as usize,vheight as usize).unwrap();
         
         guiif 
         {
-            dbgcs: 0xf000, 
-            dbgip: 0x100, 
+            dbgcs: inCS, 
+            dbgip: inIP, 
             dbgCursorLine: 0, 
             dbgInstrLine: 9, 
             dbgRegline: 1,
             dbgMemoryLine: 25,
             frameBuffer: buffer,
-            videoWindow: window
+            videoWindow: window,
+            videoWinWidth: vwidth,
+            videoWinHeight: vheight
         }
     }    
 
     pub fn updateVideoWindow(&mut self)
     {
-        self.videoWindow.update_with_buffer(&self.frameBuffer,320,200).unwrap();
+        self.videoWindow.update_with_buffer(&self.frameBuffer,self.videoWinWidth as usize,self.videoWinHeight as usize).unwrap();
     }
 
     pub fn checkEscPressed(&mut self) -> bool
@@ -102,6 +109,11 @@ impl guiif
     pub fn checkDownPressed(&mut self) -> bool
     {
         return self.videoWindow.is_key_down(Key::Down);
+    }
+
+    pub fn checkLShiftPressed(&mut self) -> bool
+    {
+        return self.videoWindow.is_key_down(Key::LeftShift);
     }
 
     pub fn getKeyAction(&self) -> keyAction
@@ -181,14 +193,6 @@ impl guiif
         }
         stdout.flush().ok();
     }
-
-    /*pub fn printDebugErr(&self,err:String)
-    {
-        let mut stdout = stdout();
-        stdout.queue(cursor::MoveTo(0,0)).ok();
-        stdout.queue(style::PrintStyledContent(err.clone().white())).ok();
-        stdout.flush().ok();
-    }*/
 
     pub fn drawDebugArea(&mut self,theMachine:&mut machine,theVGA:&mut vga,theCPU:&mut x86cpu)
     {

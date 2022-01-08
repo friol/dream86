@@ -1,10 +1,16 @@
 /* the VGA - dream86 */
 
+
 pub struct vga
 {
     pub mode: u16,
     pub framebuffer: Vec<u8>,
-    pub cgaFramebuffer: Vec<u8>
+    pub cgaFramebuffer: Vec<u8>,
+    pub font9x16data:Vec<Vec<u32>>,
+    pub font9x16width:u32,
+    pub font9x16height:u32,
+    pub cursorx:usize,
+    pub cursory:usize
 }
 
 impl vga
@@ -81,17 +87,56 @@ impl vga
         self.writeMemory(addr+1,(val>>8) as u8);
     }
 
+    pub fn outputCharToStdout(&mut self,ochar:u8)
+    {
+        // if in textmode
+        if self.mode==2
+        {
+            self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)]=ochar;
+            self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)+1]=0x0f;
+            self.cursorx+=1;
+            if self.cursorx==80
+            {
+                self.cursorx=0;
+                self.cursory+=1;
+            }
+        }
+    }
+
+    fn drawTextmodeChar(&self,vecDest:&mut Vec<u32>,charDimX:u32,charDimY:u32,numCharsPerRow:u32,charNum:u32,row:u32,col:u32,scrInc:u32,fgCol:u32,bgCol:u32)
+    {
+        let mut srcx:u32=(charNum%numCharsPerRow)*charDimX;
+        let mut srcy:u32=(charNum/numCharsPerRow)*charDimY;
+
+        let dstx:u32=col*charDimX;
+        let dsty:u32=row*charDimY;
+
+        let mut destPos=dstx+(dsty*scrInc);
+        for _y in 0..charDimY
+        {
+            for _x in 0..charDimX
+            {
+                let curVal=self.font9x16data[srcy as usize][srcx as usize];
+                let curCol=if curVal==0 { bgCol } else { fgCol };
+                vecDest[destPos as usize]=curCol;
+                destPos+=1;
+                srcx+=1;
+            }
+            destPos+=scrInc-charDimX;
+            srcy+=1;
+            srcx=(charNum%numCharsPerRow)*charDimX;
+        }
+    }
+
     pub fn fbTobuf32(&self,buf32:&mut Vec<u32>)
     {
-        let cgaPalette = Vec::from([0x000000,0xff55ff,0x55ffff,0xffffff]);
+        let cgaPalette = Vec::from([0x000000,0x55ffff,0xff55ff,0xffffff]);
 
         let vgaPalette = Vec::from(
             [
-                0x000000,0x0000aa,0x00aa00,
-                0x00aaaa,0xaa0000,0xaa00aa,
-                0xaa5500,                0xaaaaaa,                0x555555,                0x5555ff,
-                0x55ff55,                0x55ffff,                0xff5555,                0xff55ff,
-                0xffff55,                0xffffff,                0x000000,                0x141414,
+                0x000000,0x0000aa,0x00aa00,0x00aaaa,0xaa0000,0xaa00aa,0xaa5500,0xaaaaaa,
+                0x555555,0x5555ff,0x55ff55,0x55ffff,0xff5555,0xff55ff,0xffff55,0xffffff,
+                0x000000,                0x141414,
                 0x202020,                0x2c2c2c,                0x383838,                0x454545,
                 0x515151,                0x616161,                0x717171,                0x828282,
                 0x929292,                0xa2a2a2,                0xb6b6b6,                0xcbcbcb,
@@ -165,6 +210,43 @@ impl vga
                 idx+=1;
             }        
         }
+        else if self.mode==0x02
+        {
+            // 80x25 text mode, 9x16 chars
+
+            let mut idx:usize=0;
+            let mut tempFb:Vec<u32>=Vec::new();
+            for _idx in 0..(720*400)            
+            {
+                tempFb.push(0);
+            }
+
+            let mut bufIdx=0;
+            for i in 0..80*25
+            {
+                let attributes:u8=self.cgaFramebuffer[bufIdx+1];
+                let fgCol=attributes&0x0f;
+                let bgCol=(attributes>>4)&0x07;
+                let charNum:u8=self.cgaFramebuffer[bufIdx];
+                self.drawTextmodeChar(&mut tempFb,
+                    9,16,
+                    32,
+                    charNum as u32,
+                    i/80,
+                    i%80,
+                    720,
+                    vgaPalette[fgCol as usize],vgaPalette[bgCol as usize]);
+                bufIdx+=2;
+            }
+
+            for i in buf32.iter_mut() 
+            {
+                let bufVal=tempFb[idx];
+                *i = bufVal;
+                idx+=1;
+            }        
+            
+        }
         else if self.mode==0x04
         {
             let mut adder=0;
@@ -227,8 +309,30 @@ impl vga
         }
     }
 
-    pub fn new() -> Self 
+    pub fn new(font9x16:&str) -> Self 
     {
+        // load fonts
+
+        let myFont9x16 = image::open(font9x16).unwrap().to_rgb8();
+        let img_width = myFont9x16.dimensions().0 as u32;
+        let img_height = myFont9x16.dimensions().1 as u32;
+
+        let mut font9x16vec:Vec<Vec<u32>>=Vec::new();
+        for y in 0..img_height
+        {
+            let mut newLine:Vec<u32>=Vec::new();
+            for x in 0..img_width
+            {
+                let imgPixel=myFont9x16.get_pixel(x,y);
+                let r=imgPixel[0] as u32; let g=imgPixel[1] as u32; let b=imgPixel[2] as u32;
+                let u32val:u32=r|(g<<8)|(b<<16);
+                newLine.push(u32val);
+            }
+            font9x16vec.push(newLine);
+        }
+
+        // framebuffers
+
         let fbSize=65536; // 64k?
         let mut vgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         let mut cgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
@@ -240,10 +344,14 @@ impl vga
 
         vga
         {
-            mode: 0,
+            mode: 2,
             framebuffer: vgaFramebuf,
-            cgaFramebuffer: cgaFramebuf
+            cgaFramebuffer: cgaFramebuf,
+            font9x16data: font9x16vec,
+            font9x16width: img_width,
+            font9x16height: img_height,
+            cursorx:0,
+            cursory:0
         }
     }
-
 }

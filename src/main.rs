@@ -13,16 +13,24 @@ mod guiif;
 
 fn main()
 {
-    let mut theVGA=vga::vga::new();
-    let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
+    let mut theVGA=vga::vga::new("./fonts/9x16.png");
+
+    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
+    //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
+    /*let mut theMachine=machine::machine::new("./programs/TROLL.com",0x100000);
+    theMachine.writeMemory(0xf000,0x116,0x90,&mut theVGA);
+    theMachine.writeMemory(0xf000,0x117,0x90,&mut theVGA);
+    theMachine.writeMemory(0xf000,0x118,0x90,&mut theVGA);*/
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
-    let mut theCPU=x86cpu::x86cpu::new();
 
-    let mut theGUI=guiif::guiif::new();
+    let mut theCPU=x86cpu::x86cpu::new(&theMachine);
+    let mut theGUI=guiif::guiif::new(&0x02,theCPU.cs,theCPU.ip);
 
     let mut goOut=false;
     while !goOut
@@ -107,12 +115,12 @@ fn main()
                 theMachine.update();
                 inum+=1;
 
-                if bytesRead==0
+                /*if theCPU.ip==0x243
                 {
                     bailOut=true;
-                }
+                }*/
 
-                if inum>6000
+                if inum>100
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
@@ -140,6 +148,10 @@ fn main()
                     if theGUI.checkDownPressed()
                     {
                         theMachine.addKeystroke(0x50);
+                    }
+                    if theGUI.checkLShiftPressed()
+                    {
+                        theMachine.addKeystroke(0xff);
                     }
                     
                     //thread::sleep(time::Duration::from_millis(4));                    
