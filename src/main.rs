@@ -5,6 +5,9 @@
 
 //use std::process;
 //use std::{thread, time};
+//use std::rc::Rc;
+//use std::cell::RefCell;
+
 
 mod vga;
 mod machine;
@@ -18,8 +21,10 @@ fn main()
     //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
-    let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/sorryass.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
@@ -29,8 +34,8 @@ fn main()
     theMachine.writeMemory(0xf000,0x118,0x90,&mut theVGA);*/
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000);
 
-    let mut theCPU=x86cpu::x86cpu::new(&theMachine);
-    let mut theGUI=guiif::guiif::new(&0x02,theCPU.cs,theCPU.ip);
+    let mut theCPU=x86cpu::x86cpu::new();
+    let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
     let mut goOut=false;
     while !goOut
@@ -38,9 +43,9 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
-        theGUI.drawMemory(&theVGA,&theMachine,0xf000,0xfa00,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0xb800,0x0fa0,80);
         theVGA.fbTobuf32(&mut theGUI.frameBuffer);
-        theGUI.updateVideoWindow();
+        theGUI.updateVideoWindow(&theVGA);
 
         //
 
@@ -71,7 +76,7 @@ fn main()
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
                     theVGA.fbTobuf32(&mut theGUI.frameBuffer);
-                    theGUI.updateVideoWindow();
+                    theGUI.updateVideoWindow(&theVGA);
                 }
                 iterations+=1;
             }
@@ -80,7 +85,7 @@ fn main()
         {
             let mut bytesRead=1;
             //while theCPU.ip!=0x201
-            while theCPU.ip!=0x274
+            while theCPU.ip!=0x267
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,false,&mut bytesRead,&0,&0);
                 theMachine.update();
@@ -115,19 +120,19 @@ fn main()
                 theMachine.update();
                 inum+=1;
 
-                /*if theCPU.ip==0x243
+                /*if theCPU.ip==0x195
                 {
                     bailOut=true;
                 }*/
 
-                if inum>100
+                if inum>6000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions);
                     theGUI.drawMemory(&theVGA,&theMachine,0xa000,0xe626,80);
                     theVGA.fbTobuf32(&mut theGUI.frameBuffer);
-                    theGUI.updateVideoWindow();
+                    theGUI.updateVideoWindow(&theVGA);
 
                     if theGUI.checkEscPressed()
                     {

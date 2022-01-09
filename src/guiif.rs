@@ -6,7 +6,7 @@ use crossterm::{ExecutableCommand, QueueableCommand,terminal, cursor, style::{se
 use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
 
 extern crate minifb;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Scale, Window, WindowOptions};
 
 use crate::machine::machine;
 use crate::x86cpu::x86cpu;
@@ -37,36 +37,26 @@ pub struct guiif
     pub frameBuffer: Vec<u32>,
     pub videoWindow: Window,
     pub videoWinWidth: u32,
-    pub videoWinHeight: u32
+    pub videoWinHeight: u32,
+    pub videoMode: u8
 }
 
 impl guiif
 {
-    pub fn new(videomode:&u8,inCS:u16,inIP:u16) -> Self 
+    pub fn new(videomode:u8,inCS:u16,inIP:u16) -> Self 
     {
         let mut stdout = stdout();
         stdout.execute(terminal::Clear(terminal::ClearType::All)).ok();
 
-        let mut window:Window;
-        let mut vwidth:u32=0;
-        let mut vheight:u32=0;
-        
-        if *videomode==0x13 { vwidth=320; vheight=200; }
-        else if *videomode==0x02 { vwidth=720; vheight=400; }
-
-        window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
-            /*scale: Scale::X2,*/
+        let vwidth:u32=320;
+        let vheight:u32=200;
+        let window:Window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
+            scale: Scale::X2,
             ..WindowOptions::default()
-        }).unwrap_or_else(|e| { panic!("{}", e); });    
+        }).unwrap_or_else(|e| { panic!("{}", e); });
+        let buffer:Vec<u32>=Vec::new();
 
-        let mut buffer: Vec<u32> = vec![0; (vwidth as usize)*(vheight as usize)];
-        for i in buffer.iter_mut() 
-        {
-            *i = 0;
-        }
-        window.update_with_buffer(&buffer,vwidth as usize,vheight as usize).unwrap();
-        
-        guiif 
+        let mut newGUI=guiif 
         {
             dbgcs: inCS, 
             dbgip: inIP, 
@@ -77,12 +67,63 @@ impl guiif
             frameBuffer: buffer,
             videoWindow: window,
             videoWinWidth: vwidth,
-            videoWinHeight: vheight
-        }
+            videoWinHeight: vheight,
+            videoMode: videomode
+        };
+
+        newGUI.initVideomode(videomode);
+        return newGUI;
     }    
 
-    pub fn updateVideoWindow(&mut self)
+    fn initVideomode(&mut self,videomode:u8)
     {
+        let mut vwidth:u32=0;
+        let mut vheight:u32=0;
+        let mut window:Window;
+        let mut buffer:Vec<u32>;
+
+        if videomode==0x13 { vwidth=320; vheight=200; }
+        else if videomode==0x01 { vwidth=360; vheight=400; }
+        else if videomode==0x02 { vwidth=720; vheight=400; }
+        else if videomode==0x04 { vwidth=320; vheight=200; }
+
+        if videomode==0x13 || videomode==0x04
+        {
+            window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
+                scale: Scale::X2,
+                ..WindowOptions::default()
+            }).unwrap_or_else(|e| { panic!("{}", e); });    
+        }
+        else
+        {
+            window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
+                /*scale: Scale::X2,*/
+                ..WindowOptions::default()
+            }).unwrap_or_else(|e| { panic!("{}", e); });    
+        }
+
+        buffer=Vec::with_capacity((vwidth as usize)*(vheight as usize));
+        for _i in 0..(vwidth as usize)*(vheight as usize)
+        {
+            buffer.push(0);
+        }
+        window.update_with_buffer(&buffer,vwidth as usize,vheight as usize).unwrap();
+
+        self.videoWinWidth=vwidth;
+        self.videoWinHeight=vheight;
+        self.frameBuffer=buffer;
+        self.videoWindow=window;
+        self.videoMode=videomode;
+    }
+
+    pub fn updateVideoWindow(&mut self,pvga:&vga)
+    {
+        // check if videomode changed
+        if (*pvga).mode!=self.videoMode.into()
+        {
+            self.initVideomode((*pvga).mode as u8);
+        }
+
         self.videoWindow.update_with_buffer(&self.frameBuffer,self.videoWinWidth as usize,self.videoWinHeight as usize).unwrap();
     }
 

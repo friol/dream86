@@ -26,6 +26,14 @@ impl vga
                 self.framebuffer[idx]=0;
             }
         }
+        else if videomodeNum==0x01
+        {
+            // 40x25 textmode 9x16
+        }
+        else if videomodeNum==0x02
+        {
+            // 80x25 textmode 9x16
+        }
         else if videomodeNum==0x04
         {
             // CGA 320x200 4 colours            
@@ -84,7 +92,7 @@ impl vga
     pub fn writeMemory16(&mut self,addr:i64,val:u16)
     {
         self.writeMemory(addr,(val&0xff) as u8);
-        self.writeMemory(addr+1,(val>>8) as u8);
+        self.writeMemory(addr+1,((val>>8)&0xff) as u8);
     }
 
     pub fn outputCharToStdout(&mut self,ochar:u8)
@@ -205,24 +213,31 @@ impl vga
             let mut idx:usize=0;
             for i in buf32.iter_mut() 
             {
-                let bufVal=self.framebuffer[idx];
-                *i = vgaPalette[bufVal as usize];
+                if idx<65536
+                {
+                    let bufVal=self.framebuffer[idx];
+                    *i = vgaPalette[bufVal as usize];
+                }
                 idx+=1;
             }        
         }
-        else if self.mode==0x02
+        else if (self.mode==0x01) || (self.mode==0x02)
         {
-            // 80x25 text mode, 9x16 chars
+            // mode 1 - 40x25 text mode, 9x16 chars, 360x400
+            // mode 2 - 80x25 text mode, 9x16 chars, 720x400
+
+            let mut resx=720; let mut resy=400; let mut rows=80; let mut cols=25;
+            if self.mode==0x01 { resx=360; resy=400; rows=40; cols=25; }
 
             let mut idx:usize=0;
             let mut tempFb:Vec<u32>=Vec::new();
-            for _idx in 0..(720*400)            
+            for _idx in 0..(resx*resy)            
             {
                 tempFb.push(0);
             }
 
             let mut bufIdx=0;
-            for i in 0..80*25
+            for i in 0..rows*cols
             {
                 let attributes:u8=self.cgaFramebuffer[bufIdx+1];
                 let fgCol=attributes&0x0f;
@@ -232,10 +247,11 @@ impl vga
                     9,16,
                     32,
                     charNum as u32,
-                    i/80,
-                    i%80,
-                    720,
+                    i/rows,
+                    i%rows,
+                    resx,
                     vgaPalette[fgCol as usize],vgaPalette[bgCol as usize]);
+                    //vgaPalette[1],vgaPalette[2]);
                 bufIdx+=2;
             }
 
@@ -245,7 +261,6 @@ impl vga
                 *i = bufVal;
                 idx+=1;
             }        
-            
         }
         else if self.mode==0x04
         {
