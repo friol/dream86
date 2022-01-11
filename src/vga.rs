@@ -29,10 +29,12 @@ impl vga
         else if videomodeNum==0x01
         {
             // 40x25 textmode 9x16
+            self.mode=0x1;
         }
         else if videomodeNum==0x02
         {
             // 80x25 textmode 9x16
+            self.mode=0x2;
         }
         else if videomodeNum==0x04
         {
@@ -100,13 +102,22 @@ impl vga
         // if in textmode
         if self.mode==2
         {
-            self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)]=ochar;
-            self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)+1]=0x0f;
-            self.cursorx+=1;
-            if self.cursorx==80
+            if (ochar==10) || (ochar==13)
             {
                 self.cursorx=0;
                 self.cursory+=1;
+                // TODO: handle scroll
+            }
+            else
+            {
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)]=ochar;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)+1]=0x0f;
+                self.cursorx+=1;
+                if self.cursorx==80
+                {
+                    self.cursorx=0;
+                    self.cursory+=1;
+                }
             }
         }
     }

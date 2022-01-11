@@ -7,6 +7,7 @@ use std::process;
 
 use crate::vga::vga;
 use crate::x86cpu::x86cpu;
+use crate::fddController::fddController;
 
 pub struct machine 
 {
@@ -47,7 +48,6 @@ impl machine
     {
         // Load .com image into F000:0100
         let comBase:usize=0xF0100;
-        //let comBase:usize=0x8130;
         
         let mut f = match File::open(fname) {
             Ok(f) => f,
@@ -71,7 +71,8 @@ impl machine
         self.keyboardQueue.push(ks);
     }
 
-    pub fn handleINT(&mut self,pcpu:&mut x86cpu,intNum:u8,pvga:&mut vga) -> bool
+    // returns if we should go on with the code
+    pub fn handleINT(&mut self,intNum:u8,pcpu:&mut x86cpu,pvga:&mut vga,pdisk:&fddController) -> bool
     {
         if intNum==0x10
         {
@@ -82,6 +83,48 @@ impl machine
                 pvga.setVideomode(pcpu.ax&0xff);
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0e00
+            {
+                // AH=0e - output char to stdout
+                let ch:u8=(pcpu.ax&0xff) as u8;
+                pvga.outputCharToStdout(ch); 
+            }
+        }
+        else if intNum==0x13
+        {
+            // disk stuff
+            if (pcpu.ax&0xff00)==0x0
+            {
+                // INT 13,0 - Reset Disk System
+                // we assume dl=drive number is 0
+
+                pcpu.ax=0; // disk status AH=0
+                pcpu.setCflag(false); // CF = 0 if successful
+            }
+            else if (pcpu.ax&0xff00)==0x0200
+            {
+                // INT 13,2 - Read Disk Sectors
+                let driveNumber=pcpu.dx&0xff;
+                let numOfSectorsToRead:u64=(pcpu.ax&0x7f) as u64;
+                let sectorNumber:u64=((pcpu.cx&0x3f)-1) as u64;
+                let trackNumber:u64=((((pcpu.cx>>6)&0xff)<<8)|(pcpu.cx>>8)) as u64;
+                let headNumber:u64=(pcpu.dx>>8) as u64;
+                let loAddr=pcpu.bx;
+                let hiAddr=pcpu.es;
+
+                if driveNumber!=0
+                {
+                    println!("Trying to read from drive that is not A:");
+                    process::exit(0x0100);
+                }
+
+                pdisk.readDiskSectors(self,pvga,numOfSectorsToRead,sectorNumber,trackNumber,headNumber,loAddr,hiAddr);
+
+                pcpu.ax=numOfSectorsToRead as u16;
+                pcpu.setCflag(false); // CF = 0 if successful
+
+                return true;
+            }            
         }
         else if intNum==0x1a
         {
@@ -137,7 +180,7 @@ impl machine
                 {
                     let scanCode:u8=self.keyboardQueue[self.keyboardQueue.len()-1];
                     self.keyboardQueue.pop();
-                    pcpu.ax=(scanCode as u16)<<8;
+                    pcpu.ax=((scanCode as u16)<<8)|(scanCode as u16);
                     return true;
                 }
             }
@@ -309,7 +352,7 @@ impl machine
         }
     }
 
-    pub fn new(comFullPath:&str,ramSize:usize) -> Self 
+    pub fn new(_comFullPath:&str,ramSize:usize) -> Self 
     {
         let mut machineRAM:Vec<u8>=Vec::with_capacity(ramSize);
         for _i in 0..ramSize
@@ -318,8 +361,8 @@ impl machine
             machineRAM.push(num as u8);
         }
 
-        //Self::loadBIOS(&mut machineRAM,"./bios/bios_cga");
-        Self::loadCOMFile(&mut machineRAM,comFullPath);
+        Self::loadBIOS(&mut machineRAM,"./bios/bios");
+        //Self::loadCOMFile(&mut machineRAM,_comFullPath);
 
         let thestack:Vec<u8>=Vec::new();
         let kq:Vec<u8>=Vec::new();

@@ -1,14 +1,16 @@
 /* gui interface - dream86 */
 
+use std::time::Instant;
 use std::collections::HashMap;
 use std::io::{stdout, Write};
 use crossterm::{ExecutableCommand, QueueableCommand,terminal, cursor, style::{self, Stylize}};
 use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
 
 extern crate minifb;
-use minifb::{Key, Scale, Window, WindowOptions};
+use minifb::{Key,  KeyRepeat, Scale, Window, WindowOptions};
 
 use crate::machine::machine;
+use crate::fddController::fddController;
 use crate::x86cpu::x86cpu;
 use crate::vga::vga;
 
@@ -63,7 +65,7 @@ impl guiif
             dbgCursorLine: 0, 
             dbgInstrLine: 9, 
             dbgRegline: 1,
-            dbgMemoryLine: 25,
+            dbgMemoryLine: 30,
             frameBuffer: buffer,
             videoWindow: window,
             videoWinWidth: vwidth,
@@ -137,6 +139,76 @@ impl guiif
         return self.videoWindow.is_key_down(Key::Left);
     }
 
+    pub fn processKeys(&mut self,pmachine:&mut machine)
+    {
+        if self.checkLeftPressed()
+        {
+            pmachine.addKeystroke(0x4b);
+        }
+        if self.checkRightPressed()
+        {
+            pmachine.addKeystroke(0x4d);
+        }
+        if self.checkUpPressed()
+        {
+            pmachine.addKeystroke(0x48);
+        }
+        if self.checkDownPressed()
+        {
+            pmachine.addKeystroke(0x50);
+        }
+        if self.checkLShiftPressed()
+        {
+            pmachine.addKeystroke(0xff);
+        }
+
+        self.videoWindow.get_keys_pressed(KeyRepeat::No).iter().for_each(|key| {
+            match key {
+                Key::A => pmachine.addKeystroke(0x61),
+                Key::B => pmachine.addKeystroke(0x62),
+                Key::C => pmachine.addKeystroke(0x63),
+                Key::D => pmachine.addKeystroke(0x64),
+                Key::E => pmachine.addKeystroke(0x65),
+                Key::F => pmachine.addKeystroke(0x66),
+                Key::G => pmachine.addKeystroke(0x67),
+                Key::H => pmachine.addKeystroke(0x68),
+                Key::I => pmachine.addKeystroke(0x69),
+                Key::J => pmachine.addKeystroke(0x6a),
+                Key::K => pmachine.addKeystroke(0x6b),
+                Key::L => pmachine.addKeystroke(0x6c),
+                Key::M => pmachine.addKeystroke(0x6d),
+                Key::N => pmachine.addKeystroke(0x6e),
+                Key::O => pmachine.addKeystroke(0x6f),
+                Key::P => pmachine.addKeystroke(0x70),
+                Key::Q => pmachine.addKeystroke(0x71),
+                Key::R => pmachine.addKeystroke(0x72),
+                Key::S => pmachine.addKeystroke(0x73),
+                Key::T => pmachine.addKeystroke(0x74),
+                Key::U => pmachine.addKeystroke(0x75),
+                Key::V => pmachine.addKeystroke(0x76),
+                Key::W => pmachine.addKeystroke(0x77),
+                Key::X => pmachine.addKeystroke(0x78),
+                Key::Y => pmachine.addKeystroke(0x79),
+                Key::Z => pmachine.addKeystroke(0x7a),
+                Key::Key0 => pmachine.addKeystroke(0x3a),
+                Key::Key1 => pmachine.addKeystroke(0x31),
+                Key::Key2 => pmachine.addKeystroke(0x32),
+                Key::Key3 => pmachine.addKeystroke(0x33),
+                Key::Key4 => pmachine.addKeystroke(0x34),
+                Key::Key5 => pmachine.addKeystroke(0x35),
+                Key::Key6 => pmachine.addKeystroke(0x36),
+                Key::Key7 => pmachine.addKeystroke(0x37),
+                Key::Key8 => pmachine.addKeystroke(0x38),
+                Key::Key9 => pmachine.addKeystroke(0x39),
+                Key::Space => pmachine.addKeystroke(0x20),
+                Key::NumPadPlus => pmachine.addKeystroke(0x2b),
+                Key::NumPadMinus => pmachine.addKeystroke(0x2d),
+                Key::Enter => pmachine.addKeystroke(0x0d),
+                _ => return,
+            }
+        });
+    }
+
     pub fn checkRightPressed(&mut self) -> bool
     {
         return self.videoWindow.is_key_down(Key::Right);
@@ -187,7 +259,7 @@ impl guiif
         }
     }
 
-    pub fn getRuntoIp(&self,theCPU:&mut x86cpu,theMachine:&mut machine,theVGA:&mut vga) -> u16
+    pub fn getRuntoIp(&self,theCPU:&mut x86cpu,theMachine:&mut machine,theVGA:&mut vga,theDisk:&fddController) -> u16
     {
         const NUM_INSTRUCTIONS:u32=15;
         let mut listOfInstructions:Vec<String>=Vec::new();
@@ -197,7 +269,7 @@ impl guiif
         let mut idx=0;
         while (bytesRead!=0) && (idx<NUM_INSTRUCTIONS)
         {
-            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp);
+            let instr:String=theCPU.executeOne(theMachine,theVGA,theDisk,true,&mut bytesRead,&self.dbgcs,&tempIp);
             if bytesRead!=0
             {
                 listOfInstructions.push(instr);
@@ -235,7 +307,7 @@ impl guiif
         stdout.flush().ok();
     }
 
-    pub fn drawDebugArea(&mut self,theMachine:&mut machine,theVGA:&mut vga,theCPU:&mut x86cpu)
+    pub fn drawDebugArea(&mut self,theMachine:&mut machine,theVGA:&mut vga,theCPU:&mut x86cpu,theDisk:&fddController)
     {
         // stack
 
@@ -252,15 +324,16 @@ impl guiif
 
         // instrs
 
-        const NUM_INSTRUCTIONS:u32=15;
+        const NUM_INSTRUCTIONS:u32=20;
         let mut listOfInstructions:Vec<String>=Vec::new();
         let mut bytesRead:u8=1;
         let mut tempIp=theCPU.ip;
+        self.dbgcs=theCPU.cs;
 
         let mut idx=0;
         while (bytesRead!=0) && (idx<NUM_INSTRUCTIONS)
         {
-            let instr:String=theCPU.executeOne(theMachine,theVGA,true,&mut bytesRead,&self.dbgcs,&tempIp);
+            let instr:String=theCPU.executeOne(theMachine,theVGA,theDisk,true,&mut bytesRead,&self.dbgcs,&tempIp);
             if bytesRead!=0
             {
                 listOfInstructions.push(instr);
@@ -278,8 +351,11 @@ impl guiif
         self.drawInstructions(&listOfInstructions);
     }
 
-    pub fn drawRegisters(&self,regsMap:&HashMap<String,u16>,flags:&u16,totins:&u64)
+    pub fn drawRegisters(&self,regsMap:&HashMap<String,u16>,flags:&u16,totins:&u64,startTime:&Instant)
     {
+        let mut elapsed = startTime.elapsed().as_secs();
+        if elapsed==0 { elapsed=1; }
+
         let mut strReg:String=String::from("");
         strReg.push_str(&format!(
             "AX:{:04x} BX:{:04x} CX:{:04x} DX:{:04x} SI:{:04x} DI:{:04x} BP:{:04x} SP:{:04x}",
@@ -288,8 +364,8 @@ impl guiif
 
         let mut strReg2:String=String::from("");
         strReg2.push_str(&format!(
-            "IP:{:04x} CS:{:04x} DS:{:04x} ES:{:04x} SS:{:04x} Instructions:{}",
-            regsMap["IP"],regsMap["CS"],regsMap["DS"],regsMap["ES"],regsMap["SS"],totins
+            "IP:{:04x} CS:{:04x} DS:{:04x} ES:{:04x} SS:{:04x} Instructions:{} IPS:{}",
+            regsMap["IP"],regsMap["CS"],regsMap["DS"],regsMap["ES"],regsMap["SS"],totins,totins/elapsed
         ));
 
         let mut stdout = stdout();
