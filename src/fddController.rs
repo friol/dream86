@@ -25,21 +25,20 @@ impl fddController
         }
     }
 
-    pub fn readDiskSectors(&self,pmachine:&mut machine,pvga:&mut vga,numOfSectorsToRead:u64,sectorNumber:u64,trackNumber:u64,_headNumber:u64,loAddr:u16,hiAddr:u16)
+    pub fn readDiskSectors(&self,pmachine:&mut machine,pvga:&mut vga,numOfSectorsToRead:u64,
+                           sectorNumber:u64,cylinderNumber:u64,_headNumber:u64,
+                           loAddr:u16,hiAddr:u16)
     {
         // we assume we have a 1.44 diskette in
         let bytesPerSector=512;
-        let sectorsPerTrack=18;
-        let tracksPerSide=80;
+        let sectorsPerTrack=18; // 3 1/2
+        //let sectorsPerTrack=9; // 5 1/4
 
-        let mut imgOffset:u64=(trackNumber*sectorsPerTrack*bytesPerSector)+(sectorNumber*bytesPerSector);
-        // add eventual heads
-        imgOffset+=_headNumber*tracksPerSide*sectorsPerTrack*bytesPerSector;
+        /*LBA = (Cylinder × HeadsPerCylinder + Head) × SectorPerTrack + (Sector − 1)
+          For a 1.44Mb 3.5" SectorsPerTrack = 18, MaxTrack = 80 HeadsPerCylinder = 2 BytesPerSector = 512*/
 
-        /*if (_headNumber==1) && (trackNumber==0) && (sectorNumber==1)
-        {
-            imgOffset=0x2600;
-        }*/
+        let lba:u64=(((cylinderNumber*2)+_headNumber)*sectorsPerTrack)+(sectorNumber);
+        let imgOffset=lba*bytesPerSector;
 
         let mut f = match File::open(self.fddFullPath.clone()) {
             Ok(f) => f,
@@ -58,6 +57,5 @@ impl fddController
             pmachine.writeMemory(hiAddr,memOffs,buf[0],pvga);
             memOffs+=1;
         }
-
     }
 }

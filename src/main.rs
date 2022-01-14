@@ -19,17 +19,19 @@ fn main()
 {
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
 
-    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000);
+    let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,0);
+    //let mut theMachine=machine::machine::new("./programs/aSMtris.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,0);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000);
-    let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/sorryass.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/basic.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
-    /*let mut theMachine=machine::machine::new("./programs/TROLL.com",0x100000);
+    /*let mut theMachine=machine::machine::new("./programs/TROLL.com",0x100000,1);
     theMachine.writeMemory(0xf000,0x116,0x90,&mut theVGA);
     theMachine.writeMemory(0xf000,0x117,0x90,&mut theVGA);
     theMachine.writeMemory(0xf000,0x118,0x90,&mut theVGA);*/
@@ -43,7 +45,7 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos2.0.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -54,8 +56,9 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x0000,0x7de0,80);
-        theVGA.fbTobuf32(&mut theGUI.frameBuffer);
+        theGUI.drawMemory(&theVGA,&theMachine,0x0000,0x7bd1,80);
+        //theGUI.drawMemory(&theVGA,&theMachine,0x0000,0x7d96,80);
+        theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
         //
@@ -87,7 +90,7 @@ fn main()
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theVGA.fbTobuf32(&mut theGUI.frameBuffer);
+                    theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
                 }
                 iterations+=1;
@@ -97,7 +100,8 @@ fn main()
         {
             let mut bytesRead=1;
             //while theCPU.ip!=0x201
-            while theCPU.ip!=0x267
+            // get position of current invader
+            while theCPU.ip!=0x25f
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
@@ -134,11 +138,12 @@ fn main()
                 theMachine.update();
                 inum+=1;
 
-                /*if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
+                //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
                 //if theCPU.ip==0x7c00
+                if theCPU.ip==0x7dd0
                 {
                     bailOut=true;
-                }*/
+                }
 
                 if inum>6000
                 {
@@ -146,7 +151,7 @@ fn main()
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
                     theGUI.drawMemory(&theVGA,&theMachine,0xa000,0xe626,80);
-                    theVGA.fbTobuf32(&mut theGUI.frameBuffer);
+                    theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 
                     if theGUI.checkEscPressed()

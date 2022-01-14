@@ -107,7 +107,11 @@ impl machine
                 let driveNumber=pcpu.dx&0xff;
                 let numOfSectorsToRead:u64=(pcpu.ax&0x7f) as u64;
                 let sectorNumber:u64=((pcpu.cx&0x3f)-1) as u64;
-                let trackNumber:u64=((((pcpu.cx>>6)&0xff)<<8)|(pcpu.cx>>8)) as u64;
+
+                //let trackNumber:u64=((((pcpu.cx>>6)&0xff)<<8)|(pcpu.cx>>8)) as u64;
+                //cylinder := ( (CX and 0xFF00) shr 8 ) or ( (CX and 0xC0) shl 2)
+                let cylinderNumber:u64=((pcpu.cx>>8)|((pcpu.cx&0xc0)<<2)) as u64;
+                
                 let headNumber:u64=(pcpu.dx>>8) as u64;
                 let loAddr=pcpu.bx;
                 let hiAddr=pcpu.es;
@@ -118,8 +122,14 @@ impl machine
                     process::exit(0x0100);
                 }
 
-                pdisk.readDiskSectors(self,pvga,numOfSectorsToRead,sectorNumber,trackNumber,headNumber,loAddr,hiAddr);
+                if numOfSectorsToRead==0
+                {
+                    println!("Trying to read 0 sectors");
+                    process::exit(0x0100);
+                }
 
+                pdisk.readDiskSectors(self,pvga,numOfSectorsToRead,sectorNumber,cylinderNumber,headNumber,loAddr,hiAddr);
+        
                 pcpu.ax=numOfSectorsToRead as u16;
                 pcpu.setCflag(false); // CF = 0 if successful
 
@@ -242,7 +252,7 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
         self.ram[flatAddr as usize]=(val&0xff) as u8;
         self.ram[(flatAddr+1) as usize]=((val>>8)&0xff) as u8;
@@ -255,7 +265,7 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
         let mut retval:u16=0;
 
@@ -274,10 +284,9 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
-        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) ||
-           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
+        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) || ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             // VGA framebuffer
             return pvga.readMemory(flatAddr);
@@ -290,10 +299,9 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
-           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
+        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) || ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             return pvga.readMemory16(flatAddr);
         }
@@ -308,10 +316,9 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
-           ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
+        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) || ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             // VGA framebuffer
             pvga.writeMemory(flatAddr,val);
@@ -326,7 +333,7 @@ impl machine
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr|(i64seg*16);
+        let flatAddr:i64=i64addr+(i64seg*16);
 
         if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
            ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
@@ -352,7 +359,7 @@ impl machine
         }
     }
 
-    pub fn new(_comFullPath:&str,ramSize:usize) -> Self 
+    pub fn new(_comFullPath:&str,ramSize:usize,mode:u8) -> Self 
     {
         let mut machineRAM:Vec<u8>=Vec::with_capacity(ramSize);
         for _i in 0..ramSize
@@ -361,8 +368,8 @@ impl machine
             machineRAM.push(num as u8);
         }
 
-        Self::loadBIOS(&mut machineRAM,"./bios/bios");
-        //Self::loadCOMFile(&mut machineRAM,_comFullPath);
+        if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios"); }
+        else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
 
         let thestack:Vec<u8>=Vec::new();
         let kq:Vec<u8>=Vec::new();

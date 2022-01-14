@@ -1,5 +1,6 @@
 /* the VGA - dream86 */
 
+use crate::guiif::guiif;
 
 pub struct vga
 {
@@ -147,8 +148,13 @@ impl vga
         }
     }
 
-    pub fn fbTobuf32(&self,buf32:&mut Vec<u32>)
+    pub fn fbTobuf32(&self,gui:&mut guiif)
     {
+        if self.mode!=gui.videoMode.into()
+        {
+            return;
+        }
+
         let cgaPalette = Vec::from([0x000000,0x55ffff,0xff55ff,0xffffff]);
 
         let vgaPalette = Vec::from(
@@ -222,7 +228,7 @@ impl vga
         if self.mode==0x13
         {
             let mut idx:usize=0;
-            for i in buf32.iter_mut() 
+            for i in gui.frameBuffer.iter_mut() 
             {
                 if idx<65536
                 {
@@ -238,7 +244,10 @@ impl vga
             // mode 2 - 80x25 text mode, 9x16 chars, 720x400
 
             let mut resx=720; let mut resy=400; let mut rows=80; let mut cols=25;
-            if self.mode==0x01 { resx=360; resy=400; rows=40; cols=25; }
+            if self.mode==0x01 
+            { 
+                resx=360; resy=400; rows=40; cols=25; 
+            }
 
             let mut idx:usize=0;
             let mut tempFb:Vec<u32>=Vec::new();
@@ -266,7 +275,7 @@ impl vga
                 bufIdx+=2;
             }
 
-            for i in buf32.iter_mut() 
+            for i in gui.frameBuffer.iter_mut() 
             {
                 let bufVal=tempFb[idx];
                 *i = bufVal;
@@ -282,7 +291,7 @@ impl vga
             let mut shifter=6;
 
             // even rows
-            for pix in buf32.iter_mut()
+            for pix in gui.frameBuffer.iter_mut()
             {
                 let theByte=self.cgaFramebuffer[adder+fbidx];
                 let b0:usize=((theByte>>shifter)&0x03) as usize;
@@ -311,7 +320,7 @@ impl vga
             shifter=6;
 
             // odd rows
-            for pix in buf32.iter_mut()
+            for pix in gui.frameBuffer.iter_mut()
             {
                 let theByte=self.cgaFramebuffer[adder+fbidx];
                 let b0:usize=((theByte>>shifter)&0x03) as usize;
