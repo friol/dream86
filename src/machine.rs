@@ -118,11 +118,11 @@ impl machine
 
                 if driveNumber!=0
                 {
-                    //println!("Trying to read from drive that is not A:");
-                    //process::exit(0x0100);
-                    pcpu.ax=0x0700;
-                    pcpu.setCflag(true);
-                    return true;
+                    println!("INT 13,2: Trying to read sectors from a drive that is not A:");
+                    process::exit(0x0100);
+                    //pcpu.ax=0x0700;
+                    //pcpu.setCflag(true);
+                    //return true;
                 }
 
                 if numOfSectorsToRead==0
@@ -232,9 +232,16 @@ impl machine
             if (pcpu.ax&0xff00)==0xc000
             {
                 // TODO
-                pcpu.ax=0;
+                pcpu.ax=pcpu.ax&0xff;
                 pcpu.bx=0;
                 pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x4100
+            {
+                // INT 15,41 - Wait on External Event (convertible only)
+                // TODO
+                pcpu.setCflag(true);
                 return true;
             }
         }
@@ -375,6 +382,12 @@ impl machine
 
                 return true;
             }
+        }
+        else
+        {
+            println!("Unknown interrupt");
+            println!("{}",intNum);
+            process::exit(0x0100);
         }
 
         return true;
