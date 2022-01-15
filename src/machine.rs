@@ -118,8 +118,11 @@ impl machine
 
                 if driveNumber!=0
                 {
-                    println!("Trying to read from drive that is not A:");
-                    process::exit(0x0100);
+                    //println!("Trying to read from drive that is not A:");
+                    //process::exit(0x0100);
+                    pcpu.ax=0x0700;
+                    pcpu.setCflag(true);
+                    return true;
                 }
 
                 if numOfSectorsToRead==0
@@ -134,7 +137,112 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
 
                 return true;
-            }            
+            }         
+            else if (pcpu.ax&0xff00)==0x0800
+            {
+                // INT 13,8 - Get Current Drive Parameters (XT & newer)   
+                // DL = drive number (0=A:, 1=2nd floppy, 80h=drive 0, 81h=drive 1)
+                if (pcpu.dx&0xff)==0x80
+                {
+                    // hard drive?
+                    pcpu.ax=(pcpu.ax&0xff)|(0x07<<8);
+                    pcpu.setCflag(true);
+                }
+                else if (pcpu.dx&0xff)==0
+                {
+                    // A: drive
+                    // BL = CMOS drive type
+                    // 01 - 5¬  360K	     03 - 3«  720K
+                    // 02 - 5¬  1.2Mb	     04 - 3« 1.44Mb                    // TODO
+                    pcpu.ax=0;
+                    pcpu.bx=(pcpu.bx&0xff00)|0x04; // 1.44mb diskette
+                    pcpu.cx=0x4f12;
+                    pcpu.dx=0x0101;
+                    pcpu.setCflag(false); // CF = 0 if successful
+                }
+                else
+                {
+                    println!("Other drive type int 13,8");
+                    process::exit(0x0100);
+                }
+
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x1500
+            {
+                // INT 13,15 - Read DASD Type (XT BIOS from 1/10/86 & newer)
+                assert_eq!(pcpu.dx&0xff,0); // drive a:
+                pcpu.ax=0x0200|(pcpu.ax&0xff);
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
+        }
+        else if intNum==0x11
+        {
+            // INT 11 - BIOS Equipment Determination / BIOS Equipment Flags
+            /*
+                AX contains the following bit flags:
+
+                    |F|E|D|C|B|A|9|8|7|6|5|4|3|2|1|0|  AX
+                    | | | | | | | | | | | | | | | `---- IPL diskette installed
+                    | | | | | | | | | | | | | | `----- math coprocessor
+                    | | | | | | | | | | | | `-------- old PC system board RAM < 256K
+                    | | | | | | | | | | | | | `----- pointing device installed (PS/2)
+                    | | | | | | | | | | | | `------ not used on PS/2
+                    | | | | | | | | | | `--------- initial video mode
+                    | | | | | | | | `------------ # of diskette drives, less 1
+                    | | | | | | | `------------- 0 if DMA installed
+                    | | | | `------------------ number of serial ports
+                    | | | `------------------- game adapter installed
+                    | | `-------------------- unused, internal modem (PS/2)
+                    `----------------------- number of printer ports     
+                    
+                    - bits 3 & 2,  system board RAM if less than 256K motherboard
+                        00 - 16K		     01 - 32K
+                        10 - 16K		     11 - 64K (normal)
+
+                    - bits 5 & 4,  initial video mode
+                        00 - unused 	     01 - 40x25 color
+                        10 - 80x25 color	     11 - 80x25 monochrome
+
+
+                    - bits 7 & 6,  number of disk drives attached, when bit 0=1
+                        00 - 1 drive	     01 - 2 drives
+                        10 - 3 drive	     11 - 4 drives                    
+            */            
+
+            pcpu.ax=0x5425; // 101 0100 0010 0101
+            return true;
+        }
+        else if intNum==0x12
+        {
+            // INT 12 - Memory Size Determination
+            pcpu.ax=0x280; // TODO configurable size
+            return true;            
+        }
+        else if intNum==0x14
+        {
+            // INT 14,0 - Initialize Communications Port Parameters
+            // TODO
+            return true;
+        }
+        else if intNum==0x15
+        {
+            // INT 15,C0 - Return System Configuration Parameters (PS/2 only)
+            if (pcpu.ax&0xff00)==0xc000
+            {
+                // TODO
+                pcpu.ax=0;
+                pcpu.bx=0;
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
+        }
+        else if intNum==0x17
+        {
+            // INT 17,1 - Initialize Printer Port
+            // TODO
+            return true;
         }
         else if intNum==0x1a
         {
@@ -144,6 +252,30 @@ impl machine
                 pcpu.ax&=0xff00; // midnight flag 0 in AL
                 pcpu.cx=((self.clockTicker&0xffff0000)>>16) as u16;
                 pcpu.dx=(self.clockTicker&0xffff) as u16;
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0200
+            {
+                // INT 1A,2 - Read Time From Real Time Clock (XT 286,AT,PS/2)
+                // TODO
+                /*
+                    CH = hours in BCD
+                    CL = minutes in BCD
+                    DH = seconds in BCD
+                    DL = 1 if daylight savings time option
+                */
+                pcpu.cx=0x2324;
+                pcpu.dx=0x0100;
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0400
+            {
+                // INT 1A,4 - Read Real Time Clock Date (XT 286,AT,PS/2)
+                // TODO
+                pcpu.cx=0x2022; // 2022 forevah
+                pcpu.dx=0x0101; 
+                pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
         }
@@ -254,8 +386,8 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr+(i64seg*16);
 
-        self.ram[flatAddr as usize]=(val&0xff) as u8;
-        self.ram[(flatAddr+1) as usize]=((val>>8)&0xff) as u8;
+        self.ram[(flatAddr-2) as usize]=(val&0xff) as u8;
+        self.ram[(flatAddr-1) as usize]=((val>>8)&0xff) as u8;
 
         self.stackey.push((val&0xff) as u8);
         self.stackey.push(((val>>8)&0xff) as u8);
@@ -269,8 +401,8 @@ impl machine
 
         let mut retval:u16=0;
 
-        retval|=self.ram[(flatAddr+2) as usize] as u16;
-        let mut upperPart:u16=self.ram[(flatAddr+3) as usize].into();
+        retval|=self.ram[(flatAddr) as usize] as u16;
+        let mut upperPart:u16=self.ram[(flatAddr+1) as usize].into();
         upperPart<<=8;
         retval|=upperPart;
 

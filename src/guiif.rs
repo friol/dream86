@@ -398,24 +398,23 @@ impl guiif
         stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine)).ok();
         stdout.queue(style::PrintStyledContent("Memory                                                          ".blue().negative())).ok();
 
+        let NUM_BYTES=17;
         for idx in 0..numBytes
         {
-            if ((idx*4)%(20*4))==0
+            if ((idx*4)%(NUM_BYTES*4))==0
             {
                 // print address
-                stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine+1+(idx/20))).ok();
+                stdout.queue(cursor::MoveTo(0,self.dbgMemoryLine+1+(idx/NUM_BYTES))).ok();
                 let ss:String=format!("{:04x}:{:04x}",startSegment,varOffset as u16);
                 stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
             }
             else
             {
-                stdout.queue(cursor::MoveTo(9+((idx*4)%(20*4)),self.dbgMemoryLine+1+(idx/20))).ok();
+                stdout.queue(cursor::MoveTo(9+((idx*4)%(NUM_BYTES*4)),self.dbgMemoryLine+1+(idx/NUM_BYTES))).ok();
                 let ss:String=format!(" {:02x}",pmachine.readMemory(startSegment,varOffset as u16,pvga));
                 stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
                 varOffset+=1;
             }
-
         }
-
     }
 }

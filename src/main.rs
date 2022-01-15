@@ -21,10 +21,10 @@ fn main()
 
     let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,0);
     //let mut theMachine=machine::machine::new("./programs/aSMtris.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,0);
-    //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000);
+    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/sorryass.com",0x100000);
     //let mut theMachine=machine::machine::new("./programs/basic.com",0x100000,1);
@@ -56,7 +56,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x0000,0x7bd1,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0x0070,0x01c0,80);
         //theGUI.drawMemory(&theVGA,&theMachine,0x0000,0x7d96,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
@@ -139,8 +139,13 @@ fn main()
                 inum+=1;
 
                 //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
-                //if theCPU.ip==0x7c00
-                if theCPU.ip==0x7dd0
+                //if theCPU.ip==0x000b
+                //if theCPU.ip==0x7dd0
+                //if theCPU.ip==0x3506
+                //if theCPU.ip==0x3668
+                //if theCPU.ip==0x36d5
+                //if theCPU.ip==0x38a2
+                if theCPU.ip==0x7c8f
                 {
                     bailOut=true;
                 }
