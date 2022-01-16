@@ -19,9 +19,9 @@ fn main()
 {
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
 
-    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,1);
+    let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,0);
     //let mut theMachine=machine::machine::new("./programs/aSMtris.com",0x100000,1);
-    let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,0);
+    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000,1);
@@ -39,13 +39,13 @@ fn main()
 
     //let theDisk=fddController::fddController::new("./diskimages/pillman.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string()); // Unhandled opcode 61 at 7d84
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops
+    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // unhandled opcode ff at 7cea
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 13 at 7c8f
+    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode 13 at 7c8f
+    //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops // Unhandled opcode d0 at 7c9e
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -149,6 +149,10 @@ fn main()
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
 
+                //if (theCPU.cs==0xf000) && (theCPU.ip==0x0475)
+                //if (theCPU.cs==0xf000) && (theCPU.ip==0x01e5)
+                //if theCPU.ip==0x0ab7
+                //if theCPU.ip==0x41c4
                 //if theCPU.ip==0x7d6e
                 //if theCPU.ip==0xdbd
                 //if theCPU.ip==0x7dd0
@@ -160,7 +164,15 @@ fn main()
                 //if theCPU.ip==0x39bc
                 //if theCPU.ip==0x3f65
                 //if theCPU.ip==0x39e2
-                if (theCPU.cs==0x9dfd) && (theCPU.ip==0x952)
+                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x952)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x729b)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x72d5)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x7433)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d58)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
+                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460)
+                if (theCPU.cs==0x2f2) && (theCPU.ip==0x6a07)
                 {
                     bailOut=true;
                 }

@@ -295,7 +295,7 @@ impl machine
                 process::exit(0x0);
             }
             // AH=0x09 - print string to stdout
-            if (pcpu.ax&0xff00)==0x0900
+            else if (pcpu.ax&0xff00)==0x0900
             {
                 let mut stringVec:Vec<u8>=Vec::new();
                 let mut curIdx=pcpu.dx;
@@ -313,6 +313,25 @@ impl machine
                     pvga.outputCharToStdout(ch);
                 }
 
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x5000
+            {
+                // INT 21,50 - Set Current Process ID (Undocumented DOS 2.x)
+                // todo
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x2500
+            {
+                // INT 21,25 - Set Interrupt Vector
+                // todo
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x4800
+            {
+                // INT 21,48 - Allocate Memory
+                // todo
+                pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
         }
@@ -513,7 +532,8 @@ impl machine
             machineRAM.push(num as u8);
         }
 
-        if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios"); }
+        //if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios"); }
+        if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios_cga"); }
         else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
 
         let thestack:Vec<u8>=Vec::new();
