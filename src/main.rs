@@ -19,9 +19,8 @@ fn main()
 {
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
 
-    let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,0);
-    //let mut theMachine=machine::machine::new("./programs/aSMtris.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,1);
+    let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,0);
     //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000,1);
@@ -31,10 +30,6 @@ fn main()
     //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
-    /*let mut theMachine=machine::machine::new("./programs/TROLL.com",0x100000,1);
-    theMachine.writeMemory(0xf000,0x116,0x90,&mut theVGA);
-    theMachine.writeMemory(0xf000,0x117,0x90,&mut theVGA);
-    theMachine.writeMemory(0xf000,0x118,0x90,&mut theVGA);*/
     //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000,1);
 
     //let theDisk=fddController::fddController::new("./diskimages/pillman.img".to_string());
@@ -42,7 +37,7 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string()); // Unhandled opcode 61 at 7d84
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
     let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // unhandled opcode ff at 7cea
+    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // jump far word without seg override
     //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 13 at 7c8f
     //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode 13 at 7c8f
     //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops // Unhandled opcode d0 at 7c9e
@@ -98,9 +93,10 @@ fn main()
         else if act==guiif::keyAction::actionRunToAddr
         {
             let mut bytesRead=1;
-            //while theCPU.ip!=0x201
-            // get position of current invader
-            while theCPU.ip!=0x25f
+
+            //while theCPU.ip!=0x5b63
+            //while theCPU.ip!=0x5958
+            while theCPU.ip!=0x4b04
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
@@ -147,6 +143,13 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3996 - 3 calls
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
+                // 0x02f2:0x153f
+                // 0x02f2:0x6a07
+                // 0x02f2:0x40ea
+                // 0x02f2:0x5df3
+                // 0x02f2:0x5a64
+                // 0x02f2:0x4af0
+
 
 
                 //if (theCPU.cs==0xf000) && (theCPU.ip==0x0475)
@@ -171,8 +174,8 @@ fn main()
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d58)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460)
-                if (theCPU.cs==0x2f2) && (theCPU.ip==0x6a07)
+                if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x6f25)
                 {
                     bailOut=true;
                 }
