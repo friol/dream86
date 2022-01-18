@@ -27,6 +27,7 @@ fn main()
     //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/sorryass.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/basic.com",0x100000,1);
+    //let mut theMachine=machine::machine::new("./programs/test386.bin",0x100000,2);
     //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000,1);
     //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
     //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
@@ -36,10 +37,11 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string()); // Unhandled opcode 61 at 7d84
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // jump far word without seg override
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 13 at 7c8f
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode 13 at 7c8f
+    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    let theDisk=fddController::fddController::new("./diskimages/test8086.bin".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // goes awry
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode d5 at 0070:1652
+    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode d5 at 0070:1652
     //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops // Unhandled opcode d0 at 7c9e
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
@@ -51,7 +53,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x0070,0x0532,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0x02f2,0x0861,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -96,7 +98,7 @@ fn main()
 
             //while theCPU.ip!=0x5b63
             //while theCPU.ip!=0x5958
-            while theCPU.ip!=0x4b04
+            while theCPU.ip!=0x1e3a
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
@@ -174,8 +176,8 @@ fn main()
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d58)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
-                if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x6f25)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
+                if (theCPU.cs==0x0000) && (theCPU.ip==0x500)
                 {
                     bailOut=true;
                 }

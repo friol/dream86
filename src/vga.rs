@@ -57,6 +57,17 @@ impl vga
         }
     }
 
+    pub fn getCursorPosition(&self) -> (usize,usize)
+    {
+        return (self.cursorx,self.cursory);
+    }
+
+    pub fn setCursorPosition(&mut self,px:u16,py:u16)
+    {
+        self.cursorx=px as usize;
+        self.cursory=py as usize;
+    }
+
     //
 
     pub fn readMemory(&self,addr:i64) -> u8
@@ -111,8 +122,8 @@ impl vga
             }
             else
             {
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)]=ochar;
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80)+1]=0x0f;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80*2)]=ochar;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80*2)+1]=0x0f;
                 self.cursorx+=1;
                 if self.cursorx==80
                 {

@@ -66,6 +66,28 @@ impl machine
         }
     }
 
+    fn loadBinFile(mem:&mut Vec<u8>,fname:&str)
+    {
+        // Load image into F000:0000
+        let comBase:usize=0xF0000;
+        
+        let mut f = match File::open(fname) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Unable to open file {} error:{}",fname,e);
+                return;
+            }
+        };
+        let comLen:usize=f.metadata().unwrap().len() as usize;
+        let mut data = Vec::new();
+        f.read_to_end(&mut data).ok();        
+
+        for i in 0..comLen
+        {
+            mem[comBase+i]=data[i];
+        }
+    }
+
     pub fn addKeystroke(&mut self,ks:u8)
     {
         self.keyboardQueue.push(ks);
@@ -88,6 +110,27 @@ impl machine
                 // AH=0e - output char to stdout
                 let ch:u8=(pcpu.ax&0xff) as u8;
                 pvga.outputCharToStdout(ch); 
+            }
+            else if (pcpu.ax&0xff00)==0x0200
+            {
+                // INT 10,2 - Set Cursor Position
+                pvga.setCursorPosition(pcpu.dx&0xff,pcpu.dx>>8);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0300
+            {
+                // INT 10,3 - Read Cursor Position and Size
+                // DH = row
+	            // DL = column
+                let cp=pvga.getCursorPosition();
+                pcpu.dx=(cp.0 as u16)|((cp.1 as u16)<<8);
+                return true;
+            }
+            else
+            {
+                println!("Unknown interrupt");
+                println!("{},{}",intNum,pcpu.ax>>8);
+                process::exit(0x0100);
             }
         }
         else if intNum==0x13
@@ -176,6 +219,12 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
+            else
+            {
+                println!("Unknown interrupt");
+                println!("{},{}",intNum,pcpu.ax>>8);
+                process::exit(0x0100);
+            }
         }
         else if intNum==0x11
         {
@@ -244,6 +293,12 @@ impl machine
                 pcpu.setCflag(true);
                 return true;
             }
+            else
+            {
+                println!("Unknown interrupt");
+                println!("{},{}",intNum,pcpu.ax>>8);
+                process::exit(0x0100);
+            }
         }
         else if intNum==0x17
         {
@@ -285,55 +340,19 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
+            else
+            {
+                println!("Unknown interrupt");
+                println!("{},{}",intNum,pcpu.ax>>8);
+                process::exit(0x0100);
+            }
         }
-        else if intNum==0x21
+        else if intNum==0x29
         {
-            // AH=0x4c - exit to DOS
-            if (pcpu.ax&0xff00)==0x4c00
-            {
-                println!("Program terminated by int 21h");
-                process::exit(0x0);
-            }
-            // AH=0x09 - print string to stdout
-            else if (pcpu.ax&0xff00)==0x0900
-            {
-                let mut stringVec:Vec<u8>=Vec::new();
-                let mut curIdx=pcpu.dx;
-
-                let mut b=self.readMemory(pcpu.ds,curIdx,pvga);
-                while (b as char).to_string()!="$"
-                {
-                    stringVec.push(b);
-                    curIdx+=1;
-                    b=self.readMemory(pcpu.ds,curIdx,pvga);
-                }
-
-                for ch in stringVec
-                {
-                    pvga.outputCharToStdout(ch);
-                }
-
-                return true;
-            }
-            else if (pcpu.ax&0xff00)==0x5000
-            {
-                // INT 21,50 - Set Current Process ID (Undocumented DOS 2.x)
-                // todo
-                return true;
-            }
-            else if (pcpu.ax&0xff00)==0x2500
-            {
-                // INT 21,25 - Set Interrupt Vector
-                // todo
-                return true;
-            }
-            else if (pcpu.ax&0xff00)==0x4800
-            {
-                // INT 21,48 - Allocate Memory
-                // todo
-                pcpu.setCflag(false); // CF = 0 if successful
-                return true;
-            }
+            // INT 29 - DOS Fast Character I/O (Undocumented 2.x+)
+            let ch:u8=(pcpu.ax&0xff) as u8;
+            pvga.outputCharToStdout(ch); 
+            return true;
         }
         else if intNum==0x16
         {
@@ -400,6 +419,12 @@ impl machine
                 }
 
                 return true;
+            }
+            else
+            {
+                println!("Unknown interrupt");
+                println!("{},{}",intNum,pcpu.ax>>8);
+                process::exit(0x0100);
             }
         }
         else
@@ -532,8 +557,8 @@ impl machine
             machineRAM.push(num as u8);
         }
 
-        //if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios"); }
         if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios_cga"); }
+        else if mode==2 { Self::loadBinFile(&mut machineRAM,_comFullPath); }
         else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
 
         let thestack:Vec<u8>=Vec::new();
