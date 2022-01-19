@@ -37,12 +37,14 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string()); // Unhandled opcode 61 at 7d84
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    let theDisk=fddController::fddController::new("./diskimages/test8086.bin".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
+    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // goes awry
     //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // goes awry
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode d5 at 0070:1652
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode d5 at 0070:1652
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 83 at 0070:1b5d
+    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode 83 at 0070:1ba3
     //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops // Unhandled opcode d0 at 7c9e
+    //let theDisk=fddController::fddController::new("./diskimages/test8086.bin".to_string());
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -96,9 +98,9 @@ fn main()
         {
             let mut bytesRead=1;
 
-            //while theCPU.ip!=0x5b63
-            //while theCPU.ip!=0x5958
-            while theCPU.ip!=0x1e3a
+            //while theCPU.ip!=0x6a07
+            //while theCPU.ip!=0x6f4d
+            while theCPU.ip!=0x153f
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
@@ -177,7 +179,7 @@ fn main()
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
-                if (theCPU.cs==0x0000) && (theCPU.ip==0x500)
+                if (theCPU.cs==0x9dfd) && (theCPU.ip==0xada)
                 {
                     bailOut=true;
                 }

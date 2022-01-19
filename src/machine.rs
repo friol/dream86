@@ -129,7 +129,7 @@ impl machine
             else
             {
                 println!("Unknown interrupt");
-                println!("{},{}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
         }
@@ -219,10 +219,18 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x1600
+            {
+                // INT 13,16 - Change of Disk Status (XT BIOS from 1/10/86 & newer)
+                assert_eq!(pcpu.dx&0xff,0); // drive a:
+                pcpu.ax=0x0000|(pcpu.ax&0xff);
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");
-                println!("{},{}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
         }
@@ -260,7 +268,7 @@ impl machine
                         10 - 3 drive	     11 - 4 drives                    
             */            
 
-            pcpu.ax=0x5425; // 101 0100 0010 0101
+            pcpu.ax=0x5115; // 101 0100 0100 0101
             return true;
         }
         else if intNum==0x12
@@ -423,9 +431,14 @@ impl machine
             else
             {
                 println!("Unknown interrupt");
-                println!("{},{}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
+        }
+        else if intNum==0x24
+        {
+            // do nothing for now
+            return true;
         }
         else
         {

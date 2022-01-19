@@ -190,7 +190,7 @@ impl guiif
                 Key::X => pmachine.addKeystroke(0x78),
                 Key::Y => pmachine.addKeystroke(0x79),
                 Key::Z => pmachine.addKeystroke(0x7a),
-                Key::Key0 => pmachine.addKeystroke(0x3a),
+                Key::Key0 => pmachine.addKeystroke(0x30),
                 Key::Key1 => pmachine.addKeystroke(0x31),
                 Key::Key2 => pmachine.addKeystroke(0x32),
                 Key::Key3 => pmachine.addKeystroke(0x33),
