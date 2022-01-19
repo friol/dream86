@@ -114,23 +114,32 @@ impl vga
         // if in textmode
         if self.mode==2
         {
-            let numColumns=40;
-            if (ochar==10) || (ochar==13)
+            let numColumns=80;
+            if ochar==13
             {
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=0;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0;
+
                 self.cursorx=0;
                 self.cursory+=1;
                 // TODO: handle scroll
+            }
+            else if ochar==10
+            {
             }
             else
             {
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=ochar;
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0f;
                 self.cursorx+=1;
-                if self.cursorx==80
+                if self.cursorx==numColumns
                 {
                     self.cursorx=0;
                     self.cursory+=1;
                 }
+
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=22;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0f;
             }
         }
     }

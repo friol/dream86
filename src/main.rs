@@ -139,54 +139,21 @@ fn main()
 
                 //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
                 // 0x0070:0x356a - writes nec io.sys banner
-                // 0x0070:0x3597 - after banner xor dx,dx sp=6fc
-                // 0x0070:0x36a4 - sp=6fe
                 // 0x0070:0x36d5 - dos 3.3 tries to check hard drive (dl=0x80)
                 // 0x0070:0x3708 - dos 3.3 drive a: check (dl=00)
-                // 0x0070:0x37f5 - sp=700
                 // 0x0070:0x3928 - int 15h
-                // 0x0070:0x3996 - 3 calls
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
-                // 0x02f2:0x153f
-                // 0x02f2:0x6a07
-                // 0x02f2:0x40ea
-                // 0x02f2:0x5df3
-                // 0x02f2:0x5a64
-                // 0x02f2:0x4af0
 
-
-
-                //if (theCPU.cs==0xf000) && (theCPU.ip==0x0475)
-                //if (theCPU.cs==0xf000) && (theCPU.ip==0x01e5)
-                //if theCPU.ip==0x0ab7
-                //if theCPU.ip==0x41c4
-                //if theCPU.ip==0x7d6e
-                //if theCPU.ip==0xdbd
-                //if theCPU.ip==0x7dd0
-                //if theCPU.ip==0x3506
-                //if theCPU.ip==0x3668
-                //if theCPU.ip==0x36a4
-                //if theCPU.ip==0x36d5
-                //if theCPU.ip==0x37f8 // mov ax,0xffff
-                //if theCPU.ip==0x39bc
-                //if theCPU.ip==0x3f65
-                //if theCPU.ip==0x39e2
-                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x952)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x729b)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x72d5)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x7433)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d58)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
-                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
-                if (theCPU.cs==0x9b28) && (theCPU.ip==0x398)
+                //if (theCPU.cs==0x9b28) && (theCPU.ip==0x398)
+                if false
                 {
                     bailOut=true;
                 }
 
-                if inum>6000
+                if inum>8000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);

@@ -334,8 +334,8 @@ impl machine
                     DH = seconds in BCD
                     DL = 1 if daylight savings time option
                 */
-                pcpu.cx=0x2324;
-                pcpu.dx=0x0100;
+                pcpu.cx=0x2228;
+                pcpu.dx=0x0001;
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
@@ -344,7 +344,7 @@ impl machine
                 // INT 1A,4 - Read Real Time Clock Date (XT 286,AT,PS/2)
                 // TODO
                 pcpu.cx=0x2022; // 2022 forevah
-                pcpu.dx=0x0101; 
+                pcpu.dx=0x0119; 
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
