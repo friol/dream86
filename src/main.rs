@@ -179,7 +179,9 @@ fn main()
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x4d9b)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0x09ab)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
-                if (theCPU.cs==0x9dfd) && (theCPU.ip==0xada)
+                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
+                //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
+                if (theCPU.cs==0x9b28) && (theCPU.ip==0x398)
                 {
                     bailOut=true;
                 }

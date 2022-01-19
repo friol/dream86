@@ -114,6 +114,7 @@ impl vga
         // if in textmode
         if self.mode==2
         {
+            let numColumns=40;
             if (ochar==10) || (ochar==13)
             {
                 self.cursorx=0;
@@ -122,8 +123,8 @@ impl vga
             }
             else
             {
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80*2)]=ochar;
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*80*2)+1]=0x0f;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=ochar;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0f;
                 self.cursorx+=1;
                 if self.cursorx==80
                 {

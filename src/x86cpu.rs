@@ -38,6 +38,7 @@ pub enum instructionType
     instrRet,
     instrClc,
     instrCld,
+    instrStd,
     instrMov,
     instrMovNoModRegRm,
     instrAnd,
@@ -109,6 +110,7 @@ pub enum instructionType
     instrLahf,
     instrSahf,
     instrAad,
+    instrAam,
 }
 
 pub struct decodedInstruction
@@ -1021,8 +1023,16 @@ impl x86cpu
                 {
                     let datab=pmachine.readMemory(readSeg,self.si,pvga);
                     pmachine.writeMemory(self.es,self.di,datab,pvga);
-                    if self.getDflag() { self.si-=inc; self.di-=inc; }
-                    else { self.si+=inc; self.di+=inc; }
+                    if self.getDflag() 
+                    { 
+                        self.si=self.si.wrapping_sub(inc);
+                        self.di=self.di.wrapping_sub(inc);
+                    }
+                    else 
+                    { 
+                        self.si=self.si.wrapping_add(inc);
+                        self.di=self.di.wrapping_add(inc);
+                    }
                 }
                 self.cx-=1;
             }
@@ -1345,7 +1355,16 @@ impl x86cpu
             if res { performJump=true; } 
         }
         else if &self.decInstr.debugDecode[0..3]=="JMP" { if true { performJump=true; } }
-        else if &self.decInstr.debugDecode[0..4]=="LOOP" { self.cx-=1; if self.cx!=0 { performJump=true; } }
+        else if &self.decInstr.debugDecode[0..4]=="LOOP" 
+        { 
+            self.cx=self.cx.wrapping_sub(1); 
+            if self.cx!=0 { performJump=true; } 
+        }
+        else if &self.decInstr.debugDecode[0..6]=="LOOPNE" 
+        { 
+            self.cx=self.cx.wrapping_sub(1); 
+            if (self.cx!=0) && (!self.getZflag()) { performJump=true; } 
+        }
         else if &self.decInstr.debugDecode[0..4]=="JCXZ" { if self.cx==0 { performJump=true; } }
         else
         {
@@ -1648,6 +1667,28 @@ impl x86cpu
                 return data; 
             }
         }
+        else if regname=="[BP+SI]" 
+        { 
+            let mut readSeg:u16=self.ss;
+            if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
+    
+            let mut bp32:i32=self.bp as i32;
+            bp32+=self.si as i32;
+
+            if self.decInstr.instrSize==16
+            {
+                let data:u16=pmachine.readMemory16(readSeg,bp32 as u16,pvga);
+                return data; 
+            }
+            else if self.decInstr.instrSize==8
+            {
+                let data:u16=pmachine.readMemory(readSeg,bp32 as u16,pvga) as u16;
+                return data; 
+            }
+        }
         else if regname=="ib" 
         { 
             return self.decInstr.u8immediate as u16; 
@@ -1810,6 +1851,21 @@ impl x86cpu
 
             let mut di32:i32=self.bp as i32;
             di32+=self.decInstr.displacement;
+
+            if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
+            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
+        }
+        else if dstReg.contains("[BP+SI+Disp]")
+        {
+            let mut writeSeg:u16=self.ss;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+
+            let mut di32:i32=self.si as i32;
+            di32+=self.decInstr.displacement;
+            di32+=self.bp as i32;
 
             if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
             else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
@@ -2289,6 +2345,7 @@ impl x86cpu
         else if it=="Ret" { return instructionType::instrRet; }
         else if it=="Clc" { return instructionType::instrClc; }
         else if it=="Cld" { return instructionType::instrCld; }
+        else if it=="Std" { return instructionType::instrStd; }
         else if it=="Inc" { return instructionType::instrInc; }
         else if it=="Dec" { return instructionType::instrDec; }
         else if it=="IncNMRR" { return instructionType::instrIncNoModRegRm; }
@@ -2360,6 +2417,7 @@ impl x86cpu
         else if it=="Lahf" { return instructionType::instrLahf; }
         else if it=="Sahf" { return instructionType::instrSahf; }
         else if it=="Aad" { return instructionType::instrAad; }
+        else if it=="Aam" { return instructionType::instrAam; }
         else { return instructionType::instrNone; }
     }
 
@@ -2411,6 +2469,7 @@ impl x86cpu
             0xf9 => { return ["STC","16","0","","","Stc","0"]; }
             0xfa => { return ["CLI","16","0","","","Cli","0"]; }
             0xfb => { return ["STI","16","0","","","Sti","0"]; }
+            0xfd => { return ["STD","16","0","","","Std","0"]; }
             // INC 16bit reg
             0x40 => { return ["INC AX","16","1","AX","","IncNMRR","0"]; }
             0x41 => { return ["INC CX","16","1","CX","","IncNMRR","0"]; }
@@ -2470,6 +2529,7 @@ impl x86cpu
             0x7D => { return ["JGE","8","1","r0","","JmpShort","0"]; }
             0x7E => { return ["JLE","8","1","r0","","JmpShort","0"]; }
             0x7F => { return ["JG","8","1","r0","","JmpShort","0"]; }
+            0xE0 => { return ["LOOPNE","8","1","r0","","JmpShort","0"]; }
             0xE2 => { return ["LOOP Short","8","1","r0","","JmpShort","0"]; }
             0xE3 => { return ["JCXZ","8","1","r0","","JmpShort","0"]; }
             0xEB => { return ["JMP Short","8","1","r0","","JmpShort","0"]; }
@@ -2510,6 +2570,7 @@ impl x86cpu
             // AND instructions
             0x20 => { return ["AND","8","2","rmb","rb","And","0"]; }
             0x22 => { return ["AND","8","2","rb","rmb","And","1"]; }
+            0x23 => { return ["AND","16","2","rw","rmw","And","1"]; }
             0x24 => { return ["AND","8","2","ib","AL","AndNMRR","0"]; }
             0x25 => { return ["AND","16","2","iw","AX","AndNMRR","0"]; }
             // OR instructions
@@ -2594,6 +2655,8 @@ impl x86cpu
             0x9f => { return ["LAHF","8","0","","","Lahf","0"]; }
             // SAHF
             0x9e => { return ["SAHF","8","0","","","Sahf","0"]; }
+            // AAM
+            0xd4 => { return ["AAM","8","0","","","Aam","0"]; }
             // AAD
             0xd5 => { return ["AAD","16","0","","","Aad","0"]; }
 
@@ -3147,6 +3210,11 @@ impl x86cpu
             self.setCflag(true);
             self.ip+=self.decInstr.insLen as u16;
         }
+        else if self.decInstr.insType==instructionType::instrStd
+        {
+            self.setDflag(true);
+            self.ip+=self.decInstr.insLen as u16;
+        }
         else if self.decInstr.insType==instructionType::instrCli
         {
             // TODO
@@ -3519,6 +3587,20 @@ impl x86cpu
             self.doPflag(self.ax);
             self.doSflag(self.ax,16);
             
+            self.ip+=2;
+        }
+        else if self.decInstr.insType==instructionType::instrAam
+        {
+            // wtf does this do
+            let mut al=self.ax&0xff;
+            let remainder=al%0x0a;
+            al/=0x0a;
+            self.ax=remainder|(al<<8);
+
+            self.doZflag(self.ax&0xff);
+            self.doPflag(self.ax&0xff);
+            self.doSflag(self.ax&0xff,8);
+
             self.ip+=2;
         }
         else if self.decInstr.insType==instructionType::instrNop
