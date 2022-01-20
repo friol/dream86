@@ -57,6 +57,16 @@ impl vga
         }
     }
 
+    pub fn getNumberOfColumns(&self) -> u16
+    {
+        if self.mode==0x01
+        {
+            return 40;
+        }
+
+        return 80;
+    }
+
     pub fn getCursorPosition(&self) -> (usize,usize)
     {
         return (self.cursorx,self.cursory);
@@ -109,11 +119,47 @@ impl vga
         self.writeMemory(addr+1,((val>>8)&0xff) as u8);
     }
 
+    pub fn clrScreenMode2(&mut self)
+    {
+        let mut pos=0;
+        for _c in 0..80*2*25
+        {
+            self.cgaFramebuffer[pos]=0;
+            pos+=1;
+        }
+    }
+
+    fn handleScrollMode2(&mut self)
+    {
+        let mut pos=0;
+        let columns=80;
+        if self.cursory==25
+        {
+            for _row in 0..24
+            {
+                for _c in 0..columns*2
+                {
+                    self.cgaFramebuffer[pos]=self.cgaFramebuffer[pos+(columns*2)];
+                    pos+=1;
+                }
+            }            
+
+            for _c in 0..columns*2
+            {
+                self.cgaFramebuffer[pos]=0;
+                pos+=1;
+            }
+
+            self.cursory-=1;
+        }
+    }
+
     pub fn outputCharToStdout(&mut self,ochar:u8)
     {
         // if in textmode
         if self.mode==2
         {
+            let charCol=7;
             let numColumns=80;
             if ochar==13
             {
@@ -122,7 +168,7 @@ impl vga
 
                 self.cursorx=0;
                 self.cursory+=1;
-                // TODO: handle scroll
+                self.handleScrollMode2();
             }
             else if ochar==10
             {
@@ -130,16 +176,17 @@ impl vga
             else
             {
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=ochar;
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0f;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=charCol;
                 self.cursorx+=1;
                 if self.cursorx==numColumns
                 {
                     self.cursorx=0;
                     self.cursory+=1;
+                    self.handleScrollMode2();
                 }
 
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=22;
-                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0f;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=charCol;
             }
         }
     }

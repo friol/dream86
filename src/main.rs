@@ -1,12 +1,17 @@
-/* dream86 - 2o22 */
+
+/* 
+    dream86 - 2o22 
+
+    my 1st PC was an 80386 with MS-DOS 3.30
+    my father bought it, so this program (that runs MS-DOS 3.30) is dedicated to him
+
+*/
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
 //use std::process;
 //use std::{thread, time};
-//use std::rc::Rc;
-//use std::cell::RefCell;
 use std::time::Instant;
 
 mod vga;
@@ -55,7 +60,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x02f2,0x0861,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0x9b28,0x0101,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -147,18 +152,19 @@ fn main()
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
-                //if (theCPU.cs==0x9b28) && (theCPU.ip==0x398)
+                //if (theCPU.cs==0x9b28) && (theCPU.ip==0x31a) // after dos command
+                //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
                 if false
                 {
                     bailOut=true;
                 }
 
-                if inum>8000
+                if inum>2000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&theVGA,&theMachine,0xa000,0xe626,80);
+                    theGUI.drawMemory(&theVGA,&theMachine,0x9b28,0x0101,80);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 

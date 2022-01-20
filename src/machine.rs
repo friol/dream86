@@ -111,6 +111,28 @@ impl machine
                 let ch:u8=(pcpu.ax&0xff) as u8;
                 pvga.outputCharToStdout(ch); 
             }
+            else if (pcpu.ax&0xff00)==0x0600
+            {
+                // INT 10,6 - Scroll Window Up
+                // TODO - for now, clears the screen
+                pvga.clrScreenMode2();
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0f00
+            {
+                // INT 10,F - Get Video State
+                let numc=pvga.getNumberOfColumns();
+                let videomode=pvga.mode;
+                pcpu.ax=videomode|(numc<<8);
+                pcpu.bx=pcpu.bx&0xff;
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0b00
+            {
+                // INT 10,B - Set Color Palette
+                // TODO
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x0200
             {
                 // INT 10,2 - Set Cursor Position

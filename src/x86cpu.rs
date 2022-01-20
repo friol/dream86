@@ -280,6 +280,11 @@ impl x86cpu
 
         if regType==1
         {
+            // handle a strange bug that happens randomically on startup
+            if reg>3
+            {
+                self.abort(&format!("Index to segregtable>3 at {:04x}:{:04x} numIns {}",self.cs,self.ip,self.totInstructions));
+            }
             retVec.push(segRegTable[reg].to_string());
         }
         else
@@ -338,6 +343,10 @@ impl x86cpu
                 offs32+=self.di as i32;
                 offs32&=0xffff;
                 dst=offs32 as u16;
+            }
+            else if operand1.contains("Direct Addr")
+            {
+                dst=self.decInstr.directAddr;
             }
             else
             {
@@ -1167,15 +1176,15 @@ impl x86cpu
             self.ip+=self.decInstr.insLen as u16;
         }
         else 
-        { 
+        {
             if self.decInstr.repPrefix=="REPNE"
             {
                 if self.cx!=0
                 {
-                    let datab:i32=pmachine.readMemory(readSeg,self.di,pvga) as i32;
+                    let datab:i16=pmachine.readMemory(readSeg,self.di,pvga) as i16;
 
-                    let axi32=self.ax as i32;
-                    let mut result:i32=axi32-datab;
+                    let axi16=(self.ax&0xff) as i16;
+                    let mut result:i16=axi16-datab;
                     result&=0xff;
         
                     self.doZflag(result as u16);
@@ -1194,6 +1203,24 @@ impl x86cpu
                     self.ip+=self.decInstr.insLen as u16;
                 }
             }
+            else
+            {
+                let datab:i16=pmachine.readMemory(readSeg,self.di,pvga) as i16;
+
+                let axi16=(self.ax&0xff) as i16;
+                let mut result:i16=axi16-datab;
+                result&=0xff;
+    
+                self.doZflag(result as u16);
+                self.doPflag(result as u16);
+                self.doSflag(result as u16,self.decInstr.instrSize);
+                self.doCflag(result as u16,self.decInstr.instrSize);
+    
+                if self.getDflag() { self.di-=1; }
+                else { self.di+=1; }
+
+                self.ip+=self.decInstr.insLen as u16;
+            }
         }
     }
 
@@ -1207,7 +1234,37 @@ impl x86cpu
 
         if self.decInstr.repPrefix=="".to_string()
         {
-            self.abort("Unhandled cmps without prefix");
+            if self.decInstr.instrSize==16
+            {
+                let data:i32=pmachine.readMemory16(self.es,self.di,pvga) as i32;
+                let val2compare:i32=pmachine.readMemory16(readSeg,self.si,pvga) as i32;
+
+                let cmpval:i32=val2compare-data;
+        
+                if val2compare<data { self.setCflag(true); }
+                else { self.setCflag(false); }
+        
+                self.doSflag((cmpval&0xffff) as u16,8);
+                self.doZflag(cmpval as u16);
+                self.doPflag(cmpval as u16);
+
+                if self.getDflag() { 
+                    self.di=self.di.wrapping_sub(2);
+                    self.si=self.si.wrapping_sub(2);
+                }
+                else { 
+                    self.di=self.di.wrapping_add(2);
+                    self.si=self.si.wrapping_add(2);
+                }
+
+                self.ip+=self.decInstr.insLen as u16;
+            }
+            else
+            {
+                self.abort(&format!("Unhandled cmps without rep prefix bits {}",self.decInstr.instrSize));
+            }
+
+            return;
         }
 
         if self.decInstr.instrSize==16
@@ -1355,15 +1412,20 @@ impl x86cpu
             if res { performJump=true; } 
         }
         else if &self.decInstr.debugDecode[0..3]=="JMP" { if true { performJump=true; } }
+        else if &self.decInstr.debugDecode[0..6]=="LOOPNE" 
+        { 
+            self.cx=self.cx.wrapping_sub(1); 
+            if (self.cx!=0) && (self.getZflag()==false) { performJump=true; } 
+        }
+        else if &self.decInstr.debugDecode[0..6]=="LOOPE" 
+        { 
+            self.cx=self.cx.wrapping_sub(1); 
+            if (self.cx!=0) && (self.getZflag()==true) { performJump=true; } 
+        }
         else if &self.decInstr.debugDecode[0..4]=="LOOP" 
         { 
             self.cx=self.cx.wrapping_sub(1); 
             if self.cx!=0 { performJump=true; } 
-        }
-        else if &self.decInstr.debugDecode[0..6]=="LOOPNE" 
-        { 
-            self.cx=self.cx.wrapping_sub(1); 
-            if (self.cx!=0) && (!self.getZflag()) { performJump=true; } 
         }
         else if &self.decInstr.debugDecode[0..4]=="JCXZ" { if self.cx==0 { performJump=true; } }
         else
@@ -1655,6 +1717,29 @@ impl x86cpu
     
             let mut bp32:i32=self.bp as i32;
             bp32+=self.di as i32;
+
+            if self.decInstr.instrSize==16
+            {
+                let data:u16=pmachine.readMemory16(readSeg,bp32 as u16,pvga);
+                return data; 
+            }
+            else if self.decInstr.instrSize==8
+            {
+                let data:u16=pmachine.readMemory(readSeg,bp32 as u16,pvga) as u16;
+                return data; 
+            }
+        }
+        else if regname.contains("[BP+DI+Disp]")
+        { 
+            let mut readSeg:u16=self.ss;
+            if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
+    
+            let mut bp32:i32=self.bp as i32;
+            bp32+=self.di as i32;
+            bp32+=self.decInstr.displacement;
 
             if self.decInstr.instrSize==16
             {
@@ -2530,6 +2615,7 @@ impl x86cpu
             0x7E => { return ["JLE","8","1","r0","","JmpShort","0"]; }
             0x7F => { return ["JG","8","1","r0","","JmpShort","0"]; }
             0xE0 => { return ["LOOPNE","8","1","r0","","JmpShort","0"]; }
+            0xE1 => { return ["LOOPE","8","1","r0","","JmpShort","0"]; }
             0xE2 => { return ["LOOP Short","8","1","r0","","JmpShort","0"]; }
             0xE3 => { return ["JCXZ","8","1","r0","","JmpShort","0"]; }
             0xEB => { return ["JMP Short","8","1","r0","","JmpShort","0"]; }
@@ -2674,6 +2760,7 @@ impl x86cpu
             0x8101 => { return ["OR","16","2","iw","rmw","Or","0"]; }
             0x8104 => { return ["AND","16","2","iw","rmw","And","0"]; }
             0x8105 => { return ["SUB","16","2","iw","rmw","Sub","0"]; }
+            0x8106 => { return ["XOR","16","2","iw","rmw","Xor","0"]; }
             0x8107 => { return ["CMP","16","2","iw","rmw","Cmp","0"]; }
 
             0x8300 => { return ["ADD","16","2","eb","rmw","Add","0"]; }
@@ -2681,6 +2768,7 @@ impl x86cpu
             0x8303 => { return ["SBB","16","2","eb","rmw","Sbb","0"]; }
             0x8304 => { return ["AND","16","2","eb","rmw","And","0"]; }
             0x8305 => { return ["SUB","16","2","eb","rmw","Sub","0"]; }
+            0x8306 => { return ["XOR","16","2","eb","rmw","Xor","0"]; }
             0x8307 => { return ["CMP","16","2","eb","rmw","Cmp","0"]; }
 
             0xc004 => { return ["SHL","8","2","rmb","ib","Shl","1"]; }            // 186
@@ -3326,26 +3414,6 @@ impl x86cpu
             // INT nn
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
-            /*if (intNum==0x10) && (self.ax>>8)==0x0e
-            {
-                //self.abort(&format!("INT 10,0x0e at {:04x}",self.ip));
-
-                // output char at pos
-                let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
-                let newcs=pmachine.readMemory16(0x0,((intNum as u16)*4)+2,pvga);
-
-                pmachine.push16(self.flags,self.ss,self.sp);
-                self.sp-=2;
-                pmachine.push16(self.cs,self.ss,self.sp);
-                self.sp-=2;
-                pmachine.push16(self.ip+2,self.ss,self.sp);
-                self.sp-=2;
-                    
-                self.cs=newcs;
-                self.ip=newip;
-                //self.abort(&format!("INT 10,0x0e towards {:04x}:{:04x}",newcs,newip));
-            }
-            else*/
             if (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f)
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
@@ -3829,7 +3897,12 @@ impl x86cpu
             let opcode=pmachine.readMemory(tmpcs,tmpip,pvga);
             if debugFlag==false
             {
-                self.abort(&format!("x86cpu::Unhandled opcode {:02x} at {:04x}:{:04x}",opcode,self.cs,self.ip));
+                self.abort(&format!("x86cpu::Unhandled opcode {:02x} at {:04x}:{:04x} Next bytes {:02x}{:02x}{:02x}",opcode,self.cs,self.ip,
+                pmachine.readMemory(self.cs,self.ip+1,pvga),
+                pmachine.readMemory(self.cs,self.ip+2,pvga),
+                pmachine.readMemory(self.cs,self.ip+3,pvga)
+                )
+            );
             }
             return format!("UNHANDLED ({:02x})",opcode);
         }
