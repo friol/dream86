@@ -1,4 +1,4 @@
-# dream86
+# dream86 - an x86/PC :computer: emulator
 
 ![alley cat screenshot](https://github.com/friol/dream86/raw/master/alleycat.png)
 
