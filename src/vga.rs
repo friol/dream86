@@ -173,6 +173,14 @@ impl vga
             else if ochar==10
             {
             }
+            else if ochar==8
+            {
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=0;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=0x0;
+                self.cursorx-=1;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=22;
+                self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)+1]=charCol;
+            }
             else
             {
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=ochar;

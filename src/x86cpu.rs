@@ -6,9 +6,7 @@
     TODO:
     - the big rewrite part 2: generic get/set registers/addresses
     - rewrite all the get/set flags functions as one
-    - optimize. I think we are slow. yeah, definitely.
     - wrap around registers everywhere
-    - f*cking fps counter
     - make dirojedc.com work. now works but upside down
     - unify lds, les, etc.
     
@@ -107,6 +105,7 @@ pub enum instructionType
     instrJumpnw,
     instrJumpfw,
     instrPusha,
+    instrPopa,
     instrLahf,
     instrSahf,
     instrAad,
@@ -1244,7 +1243,7 @@ impl x86cpu
                 if val2compare<data { self.setCflag(true); }
                 else { self.setCflag(false); }
         
-                self.doSflag((cmpval&0xffff) as u16,8);
+                self.doSflag((cmpval&0xffff) as u16,16);
                 self.doZflag(cmpval as u16);
                 self.doPflag(cmpval as u16);
 
@@ -1261,7 +1260,29 @@ impl x86cpu
             }
             else
             {
-                self.abort(&format!("Unhandled cmps without rep prefix bits {}",self.decInstr.instrSize));
+                let data:i32=pmachine.readMemory(self.es,self.di,pvga) as i32;
+                let val2compare:i32=pmachine.readMemory(readSeg,self.si,pvga) as i32;
+
+                let cmpval:i32=val2compare-data;
+        
+                if val2compare<data { self.setCflag(true); }
+                else { self.setCflag(false); }
+        
+                self.doSflag((cmpval&0xff) as u16,8);
+                self.doZflag(cmpval as u16);
+                self.doPflag(cmpval as u16);
+
+                if self.getDflag() { 
+                    self.di=self.di.wrapping_sub(1);
+                    self.si=self.si.wrapping_sub(1);
+                }
+                else { 
+                    self.di=self.di.wrapping_add(1);
+                    self.si=self.si.wrapping_add(1);
+                }
+                
+                self.ip+=self.decInstr.insLen as u16;
+                //self.abort(&format!("Unhandled cmps without rep prefix bits {}",self.decInstr.instrSize));
             }
 
             return;
@@ -1281,7 +1302,7 @@ impl x86cpu
                     if val2compare<data { self.setCflag(true); }
                     else { self.setCflag(false); }
             
-                    self.doSflag((cmpval&0xffff) as u16,8);
+                    self.doSflag((cmpval&0xffff) as u16,16);
                     self.doZflag(cmpval as u16);
                     self.doPflag(cmpval as u16);
 
@@ -2494,6 +2515,7 @@ impl x86cpu
         else if it=="Rcr" { return instructionType::instrRcr; }
         else if it=="Rcl" { return instructionType::instrRcl; }
         else if it=="Pusha" { return instructionType::instrPusha; }
+        else if it=="Popa" { return instructionType::instrPopa; }
         else if it=="Retf" { return instructionType::instrRetf; }
         else if it=="Retfiw" { return instructionType::instrRetfiw; }
         else if it=="Iret" { return instructionType::instrIret; }
@@ -2539,8 +2561,9 @@ impl x86cpu
             0x55 => { return ["PUSH BP","16","1","BP","","PushNMRR","0"]; }
             0x56 => { return ["PUSH SI","16","1","SI","","PushNMRR","0"]; }
             0x57 => { return ["PUSH DI","16","1","DI","","PushNMRR","0"]; }
-            // PUSHA
+            // PUSHA/POPA
             0x60 => { return ["PUSHA","16","0","","","Pusha","0"]; }
+            0x61 => { return ["POPA","16","0","","","Popa","0"]; }
             // POPF, PUSHF
             0x9c => { return ["PUSHF","16","0","","","Pushf","0"]; }
             0x9d => { return ["POPF","16","0","","","Popf","0"]; }
@@ -2773,6 +2796,8 @@ impl x86cpu
 
             0xc004 => { return ["SHL","8","2","rmb","ib","Shl","1"]; }            // 186
             0xc005 => { return ["SHR","8","2","rmb","ib","Shl","1"]; }            // 186
+            
+            0xc104 => { return ["SHL","16","2","rmw","ib","Shl","1"]; }            // 186
             0xc105 => { return ["SHR","16","2","rmw","ib","Shr","1"]; }            // 186
 
             0xd000 => { return ["ROL","8","2","rmb","1","Rol","1"]; }
@@ -3414,7 +3439,7 @@ impl x86cpu
             // INT nn
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
-            if (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f)
+            if (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) // || (intNum==131)
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
                 let newcs=pmachine.readMemory16(0x0,((intNum as u16)*4)+2,pvga);
@@ -3629,6 +3654,19 @@ impl x86cpu
             self.sp-=2;
 
             self.sp+=8;
+
+            self.ip+=self.decInstr.insLen as u16;
+        }
+        else if self.decInstr.insType==instructionType::instrPopa
+        {
+            self.di=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.si=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.bp=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            let _discarded=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.bx=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.dx=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.cx=pmachine.pop16(self.ss,self.sp); self.sp+=2;
+            self.ax=pmachine.pop16(self.ss,self.sp); self.sp+=2;
 
             self.ip+=self.decInstr.insLen as u16;
         }

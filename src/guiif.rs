@@ -201,8 +201,11 @@ impl guiif
                 Key::Key8 => pmachine.addKeystroke(0x38),
                 Key::Key9 => pmachine.addKeystroke(0x39),
                 Key::Space => pmachine.addKeystroke(0x20),
+                Key::Period => pmachine.addKeystroke(46),
+                Key::NumPadAsterisk => pmachine.addKeystroke(42),
+                Key::Backspace => pmachine.addKeystroke(0x08),
                 Key::NumPadPlus => pmachine.addKeystroke(0x2b),
-                Key::NumPadMinus => pmachine.addKeystroke(0x2d),
+                Key::Minus => pmachine.addKeystroke(0x2d),
                 Key::Enter => pmachine.addKeystroke(0x0d),
                 _ => return,
             }

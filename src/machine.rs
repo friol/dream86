@@ -233,6 +233,14 @@ impl machine
 
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0300
+            {
+                // INT 13,3 - Write Disk Sectors
+                // TODO
+                pcpu.ax&=0xff;
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x1500
             {
                 // INT 13,15 - Read DASD Type (XT BIOS from 1/10/86 & newer)
@@ -346,6 +354,12 @@ impl machine
                 pcpu.dx=(self.clockTicker&0xffff) as u16;
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0100
+            {
+                // INT 1A,1 - Set System Clock Counter
+                // TODO
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x0200
             {
                 // INT 1A,2 - Read Time From Real Time Clock (XT 286,AT,PS/2)
@@ -361,6 +375,20 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0300
+            {
+                // INT 1A,3 - Set Time on Real Time Clock (XT 286,AT,PS/2)
+                // TODO
+                /*
+                    CH = hours in BCD
+                    CL = minutes in BCD
+                    DH = seconds in BCD
+                    DL = 1 if daylight savings time option
+                    = 0 if standard time
+                */
+
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x0400
             {
                 // INT 1A,4 - Read Real Time Clock Date (XT 286,AT,PS/2)
@@ -370,10 +398,16 @@ impl machine
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0500
+            {
+                // INT 1A,5 - Set Real Time Clock Date (XT 286,AT,PS/2)
+                // TODO
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");
-                println!("{},{}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
         }
@@ -448,6 +482,12 @@ impl machine
                     pcpu.ax=0xff00|al;
                 }
 
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0300
+            {
+                // INT 16,3 - Set Keyboard Typematic Rate (AT+)
+                // TODO: will implement it one day...
                 return true;
             }
             else
