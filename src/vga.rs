@@ -154,6 +154,28 @@ impl vga
         }
     }
 
+    pub fn readCharAttributeAtCursorPos(&self) -> u16
+    {
+        let numColumns=80;
+        let ch:u16=self.cgaFramebuffer[((self.cursorx)*2)+(self.cursory*numColumns*2)] as u16;
+        let attr:u16=self.cgaFramebuffer[((self.cursorx)*2)+(self.cursory*numColumns*2)+1] as u16;
+        return ch|(attr<<8);
+    }
+
+    pub fn writeCharsWithAttribute(&mut self,ochar:u16,attrib:u16,nchars:u16)
+    {
+        // if in textmode
+        if self.mode==2
+        {
+            let numColumns=80;
+            for _i in 0..nchars
+            {
+                self.cgaFramebuffer[((self.cursorx+_i as usize)*2)+(self.cursory*numColumns*2)]=ochar as u8;
+                self.cgaFramebuffer[((self.cursorx+_i as usize)*2)+(self.cursory*numColumns*2)+1]=attrib as u8;
+            }
+        }
+    }
+
     pub fn outputCharToStdout(&mut self,ochar:u8)
     {
         // if in textmode

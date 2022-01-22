@@ -7,8 +7,9 @@
     - the big rewrite part 2: generic get/set registers/addresses
     - rewrite all the get/set flags functions as one
     - wrap around registers everywhere
-    - make dirojedc.com work. now works but upside down
     - unify lds, les, etc.
+    - auxiliary flag
+    - overflow flag
     
 */
 
@@ -239,7 +240,7 @@ impl x86cpu
     */
 
     // regtype: 0 register, 1 segreg
-    fn debugDecodeAddressingModeByte(&self,b:u8,regType:u8,wbit:u8) -> Vec<String>
+    fn debugDecodeAddressingModeByte(&self,b:u8,regType:u8,wbit:u8,coherency:&mut bool) -> Vec<String>
     {
         let mut retVec:Vec<String>=Vec::new();
 
@@ -279,16 +280,15 @@ impl x86cpu
 
         if regType==1
         {
-            // handle a strange bug that happens randomically on startup
             if reg>3
             {
-                self.abort(&format!("Index to segregtable>3 at {:04x}:{:04x} numIns {}",self.cs,self.ip,self.totInstructions));
+                *coherency=false;
+                return retVec;
             }
             retVec.push(segRegTable[reg].to_string());
         }
         else
         {
-            // TODO use registers table            
             if wbit==1 { retVec.push(reg16bTable[reg].to_string()); }
             else  { retVec.push(reg8bTable[reg].to_string()); }
         }
@@ -1146,16 +1146,16 @@ impl x86cpu
             self.abort("Unhandled seg override in SCAS");
         }
 
-        if self.decInstr.repPrefix=="REPE"
+        if (self.decInstr.repPrefix=="REPE") && (self.decInstr.instrSize==16)
         {
-            self.abort("Unhandled rep prefix in SCAS");
+            self.abort(&format!("Unhandled rep prefix REPE in SCAS at {:04x}:{:04x} {} bits",self.cs,self.ip,self.decInstr.instrSize));
         }
 
         if self.decInstr.instrSize==16
         {
             if self.decInstr.repPrefix=="REPNE"
             {
-                self.abort("Unhandled rep prefix in SCAS");
+                self.abort("Unhandled rep prefix REPNE in SCAS 16 bit");
             }
     
             // TODO REVIEW
@@ -1196,6 +1196,32 @@ impl x86cpu
 
                     self.cx-=1;
                     if result==0 { self.ip+=self.decInstr.insLen as u16; return; }
+                }
+                else
+                {
+                    self.ip+=self.decInstr.insLen as u16;
+                }
+            }
+            else if self.decInstr.repPrefix=="REPE"
+            {
+                if self.cx!=0
+                {
+                    let datab:i16=pmachine.readMemory(readSeg,self.di,pvga) as i16;
+
+                    let axi16=(self.ax&0xff) as i16;
+                    let mut result:i16=axi16-datab;
+                    result&=0xff;
+        
+                    self.doZflag(result as u16);
+                    self.doPflag(result as u16);
+                    self.doSflag(result as u16,self.decInstr.instrSize);
+                    self.doCflag(result as u16,self.decInstr.instrSize);
+        
+                    if self.getDflag() { self.di-=1; }
+                    else { self.di+=1; }
+
+                    self.cx-=1;
+                    if result!=0 { self.ip+=self.decInstr.insLen as u16; return; }
                 }
                 else
                 {
@@ -2737,7 +2763,8 @@ impl x86cpu
             0x8d => { return ["LEA","16","2","rmw","rw","Lea","1"]; }            
             // OUT 
             0xe6 => { return ["OUT","8","2","ib","AL","OutNMRR","0"]; }            
-            0xee => { return ["OUT","8","2","AL","DX","Out","0"]; }            
+            0xee => { return ["OUT","8","2","AL","DX","OutNMRR","0"]; }            
+            0xef => { return ["OUT","16","2","AX","DX","OutNMRR","0"]; }            
             // NOP 
             0x90 => { return ["NOP","8","0","","","Nop","0"]; } // best instruction evah
             // SBB
@@ -2787,6 +2814,7 @@ impl x86cpu
             0x8107 => { return ["CMP","16","2","iw","rmw","Cmp","0"]; }
 
             0x8300 => { return ["ADD","16","2","eb","rmw","Add","0"]; }
+            0x8301 => { return ["OR","16","2","eb","rmw","Or","0"]; }
             0x8302 => { return ["ADC","16","2","eb","rmw","Adc","0"]; }
             0x8303 => { return ["SBB","16","2","eb","rmw","Sbb","0"]; }
             0x8304 => { return ["AND","16","2","eb","rmw","And","0"]; }
@@ -2820,6 +2848,7 @@ impl x86cpu
 
             0xf600 => { return ["TEST","8","2","ib","rmb","Test","0"]; }
             0xf602 => { return ["NOT","8","1","rmb","","Not","0"]; }
+            0xf603 => { return ["NEG","8","1","rmb","","Neg","0"]; }
             0xf604 => { return ["MUL","8","1","rmb","","Mul","1"]; }
             0xf605 => { return ["IMUL","8","1","rmb","","Imul","1"]; }
             0xf606 => { return ["DIV","8","1","rmb","","Div","1"]; }
@@ -2850,7 +2879,7 @@ impl x86cpu
     fn prepareInstructionParameters(&self,opcodeInfo:&[&str;7],cs:u16,ip:u16,instrLen:&mut u8,dbgStr:&mut String,instrWidth:&u8,
                                     u8op:&mut u8,u16op:&mut u16,daddr:&mut u16,
                                     opsrc:&mut String,opdst:&mut String,displ:&mut i32,displSize:&mut u8,iType:&instructionType,
-                                    pmachine:&machine,pvga:&vga)
+                                    pmachine:&machine,pvga:&vga) -> bool
     {
         if *iType==instructionType::instrJmpShort
         {
@@ -2899,18 +2928,6 @@ impl x86cpu
             *u16op=offset16;
             *instrLen=3;
         }
-        /*else if *iType==instructionType::instrCallFar
-        {
-            // CALL far
-            *displ=0;
-            *displSize=0;
-
-            let offset16=pmachine.readMemory16(cs,ip+2,pvga);
-            dbgStr.push_str(&format!(" 0x{:04x}",offset16));
-            *opsrc=offset16.to_string();
-            *opdst="".to_string();
-            *instrLen=4;
-        }*/
         else if (*iType==instructionType::instrMov) || 
                 (*iType==instructionType::instrAnd) ||
                 (*iType==instructionType::instrOr) ||
@@ -2947,16 +2964,27 @@ impl x86cpu
         {
             // instructions with modregrm byte
             let mut totInstrLen:u8=2;
-            let dstIsSegreg:u8=if (*opsrc=="sr".to_string()) || (*opdst=="sr".to_string()) { 1 } else { 0 };
+            
+            let mut dstIsSegreg:u8=0;
+            if ((*opsrc)=="sr".to_string()) || ((*opdst)=="sr".to_string()) 
+            {
+                dstIsSegreg=1;
+            }
+
             let mut wbit:u8=0;
-            if *instrWidth==16 { wbit=1; }
+            if (*instrWidth)==16 { wbit=1; }
             let mut operandAdder=0;
             let numOperands=opcodeInfo[2].parse::<u8>().unwrap();
             let invertOperands=opcodeInfo[6].parse::<u8>().unwrap();
             //let invertOperands=if (opcode&2)==2 { 1 } else { 0 };
 
+            let mut ddambCoherency:bool=true;
             let addressingModeByte=pmachine.readMemory(cs,ip+1,pvga);
-            let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,dstIsSegreg,wbit);
+            let moveVec:Vec<String>=self.debugDecodeAddressingModeByte(addressingModeByte,dstIsSegreg,wbit,&mut ddambCoherency);
+            if ddambCoherency==false
+            {
+                return false;
+            }
 
             if moveVec[0].contains("with 8bit disp") || moveVec[1].contains("with 8bit disp") { operandAdder=1; }
             if moveVec[0].contains("with 16bit disp") || moveVec[1].contains("with 16bit disp") { operandAdder=2; }
@@ -3159,6 +3187,8 @@ impl x86cpu
 
             dbgStr.push_str(&format!(" {},{}",realOpdst,realOpsrc));
         }
+
+        return true;
     }
 
     fn expandWideInstruction(&self,opcode:&u8,wideOpcode:&mut u16,pmachine:&machine,pvga:&vga,cs:&u16,ip:&u16)
@@ -3233,12 +3263,18 @@ impl x86cpu
             let mut u16op:u16=0;
             let mut daddr:u16=0;
             let instrType=self.getInstructionType(&opcodeInfo[5].to_string());
-            self.prepareInstructionParameters(&opcodeInfo,cs,ip+soroAdder,&mut instrLen,&mut dbgDec,
+            let pipRet=self.prepareInstructionParameters(&opcodeInfo,cs,ip+soroAdder,&mut instrLen,&mut dbgDec,
                                               &instrWidth,
                                               &mut u8op,&mut u16op,&mut daddr,
                                               &mut operandSrc,&mut operandDst,
                                               &mut displacement,&mut displSize,
                                               &instrType,pmachine,pvga);
+            if pipRet==false
+            {
+                // inconsistent situation (when debugging) with memory and opcodes, bailout
+                return false;
+            }
+
             instrLen+=soroAdder as u8;
             self.decInstr=decodedInstruction {
                 insType: instrType,
@@ -3652,8 +3688,6 @@ impl x86cpu
             self.sp-=2;
             pmachine.push16(self.di,self.ss,self.sp);
             self.sp-=2;
-
-            self.sp+=8;
 
             self.ip+=self.decInstr.insLen as u16;
         }

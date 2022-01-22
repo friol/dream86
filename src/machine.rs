@@ -105,6 +105,31 @@ impl machine
                 pvga.setVideomode(pcpu.ax&0xff);
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x0100
+            {
+                // set cursor type
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0900
+            {
+                // write char with attribute at cursor
+                // AL = ASCII character to write
+                // BH = display page  (or mode 13h, background pixel value)
+                // BL = character attribute (text) foreground color (graphics)
+                // CX = count of characters to write (CX >= 1)                
+                let al=pcpu.ax&0xff;
+                let bl=pcpu.bx&0xff;
+                let cx=pcpu.cx;
+                pvga.writeCharsWithAttribute(al,bl,cx);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0800
+            {
+                // INT 10,8 - Read Character and Attribute at Cursor Position
+                pcpu.ax=pvga.readCharAttributeAtCursorPos();
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x0e00
             {
                 // AH=0e - output char to stdout
@@ -331,10 +356,34 @@ impl machine
                 pcpu.setCflag(true);
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x8600
+            {
+                // INT 15,86 - Elapsed Time Wait (AT and PS/2)
+                // CX,DX = number of microseconds to wait (976 æs resolution)
+                // TODO
+                pcpu.ax=(0x80<<8)|(pcpu.ax&0xff);
+                pcpu.setCflag(false);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x8700
+            {
+                // INT 15,87 - Move Block to/from Extended Memory            
+                // TODO
+                pcpu.ax=(0x80<<8)|(pcpu.ax&0xff);
+                pcpu.setCflag(true);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x8800
+            {
+                // INT 15,88 - size of extended memory - should be >=286 only
+                // TODO
+                //pcpu.setCflag(true);
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");
-                println!("{},{}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
         }

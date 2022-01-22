@@ -134,29 +134,8 @@ impl guiif
         return self.videoWindow.is_key_down(Key::Escape);
     }
 
-    pub fn checkLeftPressed(&mut self) -> bool
-    {
-        return self.videoWindow.is_key_down(Key::Left);
-    }
-
     pub fn processKeys(&mut self,pmachine:&mut machine)
     {
-        if self.checkLeftPressed()
-        {
-            pmachine.addKeystroke(0x4b);
-        }
-        if self.checkRightPressed()
-        {
-            pmachine.addKeystroke(0x4d);
-        }
-        if self.checkUpPressed()
-        {
-            pmachine.addKeystroke(0x48);
-        }
-        if self.checkDownPressed()
-        {
-            pmachine.addKeystroke(0x50);
-        }
         if self.checkLShiftPressed()
         {
             pmachine.addKeystroke(0xff);
@@ -200,6 +179,7 @@ impl guiif
                 Key::Key7 => pmachine.addKeystroke(0x37),
                 Key::Key8 => pmachine.addKeystroke(0x38),
                 Key::Key9 => pmachine.addKeystroke(0x39),
+                Key::F1 => pmachine.addKeystroke(0x3b),
                 Key::Space => pmachine.addKeystroke(0x20),
                 Key::Period => pmachine.addKeystroke(46),
                 Key::NumPadAsterisk => pmachine.addKeystroke(42),
@@ -207,24 +187,14 @@ impl guiif
                 Key::NumPadPlus => pmachine.addKeystroke(0x2b),
                 Key::Minus => pmachine.addKeystroke(0x2d),
                 Key::Enter => pmachine.addKeystroke(0x0d),
+                Key::Up => pmachine.addKeystroke(0x48),
+                Key::Down => pmachine.addKeystroke(0x50),
+                Key::Left => pmachine.addKeystroke(0x4b),
+                Key::Right => pmachine.addKeystroke(0x4d),
+                Key::NumPadSlash => pmachine.addKeystroke(47),
                 _ => return,
             }
         });
-    }
-
-    pub fn checkRightPressed(&mut self) -> bool
-    {
-        return self.videoWindow.is_key_down(Key::Right);
-    }
-
-    pub fn checkUpPressed(&mut self) -> bool
-    {
-        return self.videoWindow.is_key_down(Key::Up);
-    }
-
-    pub fn checkDownPressed(&mut self) -> bool
-    {
-        return self.videoWindow.is_key_down(Key::Down);
     }
 
     pub fn checkLShiftPressed(&mut self) -> bool

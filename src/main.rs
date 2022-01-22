@@ -1,8 +1,9 @@
 
 /* 
+    
     dream86 - 2o22 
 
-    my 1st PC was an 80386 with MS-DOS 3.30
+    my 1st PC was an 80386sx with MS-DOS 3.30 (an IBM PS/2 model 55sx)
     my father bought it, so this program (that runs MS-DOS 3.30) is dedicated to him
 
 */
@@ -40,16 +41,14 @@ fn main()
 
     //let theDisk=fddController::fddController::new("./diskimages/pillman.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string()); // Unhandled opcode 61 at 7d84
+    //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
-    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
     //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // goes awry
     //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // goes awry
     //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 83 at 0070:1b5d
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // Unhandled opcode 83 at 0070:1ba3
-    //let theDisk=fddController::fddController::new("./diskimages/OLVDOS20.IMG".to_string()); // loops // Unhandled opcode d0 at 7c9e
-    //let theDisk=fddController::fddController::new("./diskimages/test8086.bin".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // waits for a key (?) then index out of bounds
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -149,12 +148,13 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
+                if (theCPU.cs==0) && (theCPU.ip==0x7c57)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
                 //if (theCPU.cs==0x9b28) && (theCPU.ip==0x31a) // after dos command
                 //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
-                if false
+                //if false
                 {
                     bailOut=true;
                 }
