@@ -88,8 +88,9 @@ impl guiif
         else if videomode==0x01 { vwidth=360; vheight=400; }
         else if videomode==0x02 { vwidth=720; vheight=400; }
         else if videomode==0x04 { vwidth=320; vheight=200; }
+        else if videomode==0x05 { vwidth=320; vheight=200; }
 
-        if videomode==0x13 || videomode==0x04
+        if videomode==0x13 || videomode==0x04  || videomode==0x05
         {
             window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
                 scale: Scale::X2,
@@ -170,7 +171,7 @@ impl guiif
                 Key::Y => pmachine.addKeystroke(0x79),
                 Key::Z => pmachine.addKeystroke(0x7a),
                 Key::Key0 => pmachine.addKeystroke(0x30),
-                Key::Key1 => pmachine.addKeystroke(0x31),
+                Key::Key1 => pmachine.addKeystroke(0x0231),
                 Key::Key2 => pmachine.addKeystroke(0x32),
                 Key::Key3 => pmachine.addKeystroke(0x33),
                 Key::Key4 => pmachine.addKeystroke(0x34),
@@ -179,18 +180,18 @@ impl guiif
                 Key::Key7 => pmachine.addKeystroke(0x37),
                 Key::Key8 => pmachine.addKeystroke(0x38),
                 Key::Key9 => pmachine.addKeystroke(0x39),
-                Key::F1 => pmachine.addKeystroke(0x3b),
-                Key::Space => pmachine.addKeystroke(0x20),
-                Key::Period => pmachine.addKeystroke(46),
-                Key::NumPadAsterisk => pmachine.addKeystroke(42),
-                Key::Backspace => pmachine.addKeystroke(0x08),
+                Key::F1 => pmachine.addKeystroke(0x3b00), 
+                Key::Space => pmachine.addKeystroke(0x3920),
+                Key::Period => pmachine.addKeystroke(0x342e),
+                Key::NumPadAsterisk => pmachine.addKeystroke(0x372a),
+                Key::Backspace => pmachine.addKeystroke(0x0e08),
                 Key::NumPadPlus => pmachine.addKeystroke(0x2b),
                 Key::Minus => pmachine.addKeystroke(0x2d),
-                Key::Enter => pmachine.addKeystroke(0x0d),
-                Key::Up => pmachine.addKeystroke(0x48),
-                Key::Down => pmachine.addKeystroke(0x50),
-                Key::Left => pmachine.addKeystroke(0x4b),
-                Key::Right => pmachine.addKeystroke(0x4d),
+                Key::Enter => pmachine.addKeystroke(0x1c0d),
+                Key::Up => pmachine.addKeystroke(0x4800),
+                Key::Down => pmachine.addKeystroke(0x5000),
+                Key::Left => pmachine.addKeystroke(0x4b00),
+                Key::Right => pmachine.addKeystroke(0x4d00),
                 Key::NumPadSlash => pmachine.addKeystroke(47),
                 _ => return,
             }

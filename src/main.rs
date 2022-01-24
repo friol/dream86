@@ -43,11 +43,14 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
+    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // ohohoh2
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
     //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // goes awry
-    //let theDisk=fddController::fddController::new("./diskimages/dos3.31.microsoft.img".to_string()); // goes awry
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // Unhandled opcode 83 at 0070:1b5d
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // unhandled opcode sbb 1c
     //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // waits for a key (?) then index out of bounds
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
@@ -59,7 +62,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x9b28,0x0101,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0xdeb,0x80,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -148,13 +151,18 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
-                if (theCPU.cs==0) && (theCPU.ip==0x7c57)
+                // 2f2:153f
+
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x011f)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0162)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
+                //if (theCPU.cs==0xd08) && (theCPU.ip==0x12d)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d15)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
                 //if (theCPU.cs==0x9b28) && (theCPU.ip==0x31a) // after dos command
                 //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
-                //if false
+                if false
                 {
                     bailOut=true;
                 }
@@ -164,7 +172,7 @@ fn main()
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&theVGA,&theMachine,0x9b28,0x0101,80);
+                    theGUI.drawMemory(&theVGA,&theMachine,0xdeb,0x80,80);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 

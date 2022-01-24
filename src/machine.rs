@@ -15,7 +15,7 @@ pub struct machine
     pub stackey: Vec<u8>,
     pub internalClockTicker: u64,
     pub clockTicker: u64,
-    pub keyboardQueue: Vec<u8>
+    pub keyboardQueue: Vec<u16>
 }
 
 impl machine 
@@ -88,9 +88,34 @@ impl machine
         }
     }
 
-    pub fn addKeystroke(&mut self,ks:u8)
+    pub fn addKeystroke(&mut self,ks:u16)
     {
         self.keyboardQueue.push(ks);
+    }
+
+    pub fn handleIn(&mut self,pcpu:&mut x86cpu,_pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
+    {
+        if addr8==0x40
+        {
+            let num:u16 = rand::thread_rng().gen_range(0..256);
+            pcpu.ax=(pcpu.ax&0xff00)|num;    
+        }
+        else if addr16==0x3da
+        {
+            // CGA status register	EGA/VGA: input status 1 register
+            // TODO
+            /*
+                bit 7-4     not used
+                bit 3 = 1   in vertical retrace
+                bit 2 = 1   light pen switch is off
+                bit 1 = 1   positive edge from light pen has set trigger
+                bit 0 = 0   do not use memory
+                = 1   memory access without interfering with display
+            */                
+            let num:u16 = rand::thread_rng().gen_range(0..256);
+            pcpu.ax=(pcpu.ax&0xff00)|num;
+        }
+
     }
 
     // returns if we should go on with the code
@@ -103,6 +128,12 @@ impl machine
             {
                 // set videomode
                 pvga.setVideomode(pcpu.ax&0xff);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x1000
+            {
+                // INT 10,10 - Set/Get Palette Registers (EGA/VGA)
+                // TODO
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0100
@@ -130,11 +161,27 @@ impl machine
                 pcpu.ax=pvga.readCharAttributeAtCursorPos();
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x1100
+            {
+                // INT 10,11 - Character Generator Routine (EGA/VGA)
+                // TODO
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x0e00
             {
                 // AH=0e - output char to stdout
                 let ch:u8=(pcpu.ax&0xff) as u8;
                 pvga.outputCharToStdout(ch); 
+            }
+            else if (pcpu.ax&0xff00)==0x0a00
+            {
+                // INT 10,A - Write Character Only at Current Cursor Position
+                // CX = count of characters to write (CX >= 1)
+                let ch:u8=(pcpu.ax&0xff) as u8;
+                for _i in 0..pcpu.cx
+                {
+                    pvga.outputCharToStdout(ch); 
+                }
             }
             else if (pcpu.ax&0xff00)==0x0600
             {
@@ -171,6 +218,30 @@ impl machine
 	            // DL = column
                 let cp=pvga.getCursorPosition();
                 pcpu.dx=(cp.0 as u16)|((cp.1 as u16)<<8);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0500
+            {
+                // INT 10,5 - Select Active Display Page
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0700
+            {
+                // INT 10,7 - Scroll Window Down
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x1200
+            {
+                // INT 10,12 - Video Subsystem Configuration (EGA/VGA)
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x1a00
+            {
+                // INT 10,1A - Video Display Combination (VGA)
+                // TODO
                 return true;
             }
             else
@@ -380,12 +451,14 @@ impl machine
                 //pcpu.setCflag(true);
                 return true;
             }
-            else
+            /*else
             {
                 println!("Unknown interrupt");
                 println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
-            }
+            }*/
+
+            return true;
         }
         else if intNum==0x17
         {
@@ -478,9 +551,10 @@ impl machine
                 }
                 else
                 {
-                    let scanCode:u8=self.keyboardQueue[self.keyboardQueue.len()-1];
+                    let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
                     self.keyboardQueue.pop();
-                    pcpu.ax=((scanCode as u16)<<8)|(scanCode as u16);
+                    //pcpu.ax=((scanCode as u16)<<8)|(scanCode as u16);
+                    pcpu.ax=scanCode;
                     return true;
                 }
             }
@@ -495,8 +569,8 @@ impl machine
                 else
                 {
                     pcpu.setZflag(false);   
-                    let scanCode:u8=self.keyboardQueue[self.keyboardQueue.len()-1];
-                    pcpu.ax=(scanCode as u16)<<8;
+                    let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
+                    pcpu.ax=scanCode; // (scanCode as u16)<<8;
                 }
                 return true;
             }
@@ -522,7 +596,7 @@ impl machine
                 }
                 else
                 {
-                    let scanCode:u8=self.keyboardQueue[self.keyboardQueue.len()-1];
+                    let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
                     if scanCode==0xff
                     {
                         al|=2;
@@ -539,6 +613,11 @@ impl machine
                 // TODO: will implement it one day...
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x9200
+            {
+                // unknown
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");
@@ -551,10 +630,16 @@ impl machine
             // do nothing for now
             return true;
         }
+        else if intNum==0x33
+        {
+            // mouse function calls
+            // TODO
+            return true;
+        }
         else
         {
             println!("Unknown interrupt");
-            println!("{}",intNum);
+            println!("{:02x},{:02x} at {:04x}:{:04x}",intNum,pcpu.ax>>8,pcpu.cs,pcpu.ip);
             process::exit(0x0100);
         }
 
@@ -686,7 +771,7 @@ impl machine
         else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
 
         let thestack:Vec<u8>=Vec::new();
-        let kq:Vec<u8>=Vec::new();
+        let kq:Vec<u16>=Vec::new();
 
         machine 
         {
