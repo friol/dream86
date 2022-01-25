@@ -23,6 +23,7 @@ mod guiif;
 
 fn main()
 {
+    let mut _breakIt=false;
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
 
     //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,1);
@@ -44,14 +45,18 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
-    let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
+    //let theDisk=fddController::fddController::new("./diskimages/dirtest.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // ohohoh2
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // zaxxon, mach3
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
-    //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // goes awry
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string());
+    let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // jumpfar bp+disp
     //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // unhandled opcode sbb 1c
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string()); // waits for a key (?) then index out of bounds
+    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string());
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -62,7 +67,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0xdeb,0x80,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0x2f2,0x560,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -83,11 +88,14 @@ fn main()
         {
             let startTime = Instant::now();
             let mut bytesRead=1;
-            let mut dbgstr=String::from("");
+            let mut _dbgstr=String::from("");
             let mut iterations:u64=0;
-            while (bytesRead!=0) && (!dbgstr.contains("RET"))
+
+            let stopit=false;
+
+            while (bytesRead!=0) && (!stopit)
             {
-                dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
+                _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
 
                 if (iterations%1000)==0
@@ -103,7 +111,7 @@ fn main()
         }
         else if act==guiif::keyAction::actionRunToAddr
         {
-            let mut bytesRead=1;
+            /*let mut bytesRead=1;
 
             //while theCPU.ip!=0x6a07
             //while theCPU.ip!=0x6f4d
@@ -111,8 +119,12 @@ fn main()
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
-            }
+            }*/
 
+            _breakIt=true;
+            
+            //theMachine.writeMemory(0xe0b,0x4f5,0x4,&mut theVGA);
+            //theMachine.writeMemory(0x977,0x3547,0x90,&mut theVGA);
         }
         else if act==guiif::keyAction::actionIncDebugCursor
         {
@@ -140,7 +152,7 @@ fn main()
             let mut bailOut=false;
             while !bailOut
             {
-                theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
+                let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
                 inum+=1;
 
@@ -151,28 +163,50 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
-                // 2f2:153f
-
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x011f)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0162)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1460) // int 21h
+                //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
+                //if ((theCPU.cs==0x2219) && (theCPU.ip==0x40))
+                //if ((theCPU.cs==0xe0b) && (theCPU.ip==0x1da9))
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x12d)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x1d15)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x3d47)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
-                //if (theCPU.cs==0x9b28) && (theCPU.ip==0x31a) // after dos command
+                //if (theCPU.cs==0x0dfb) && (theCPU.ip==0x675c)
+                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x5cb7)
                 //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
                 if false
                 {
                     bailOut=true;
                 }
 
+                //if dbgstr.contains(" (23)")
+                //{
+                    /*if 
+                        (!dbgstr.contains("AH,AH")) &&
+                        (!dbgstr.contains("BH,BH")) &&
+                        (!dbgstr.contains("CH,CH")) &&
+                        (!dbgstr.contains("DH,DH")) &&
+                        (!dbgstr.contains("AX,AX")) &&
+                        (!dbgstr.contains("BX,BX")) &&
+                        (!dbgstr.contains("CX,CX")) &&
+                        (!dbgstr.contains("BP,BP")) &&
+                        (!dbgstr.contains("SI,SI")) &&
+                        (!dbgstr.contains("DI,DI")) &&
+                        (!dbgstr.contains("DX,DX"))*/
+                  /*  {
+                        bailOut=true;
+                    }*/
+                //}
+
+
+
                 if inum>2000
                 {
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&theVGA,&theMachine,0xdeb,0x80,80);
+                    theGUI.drawMemory(&theVGA,&theMachine,0x2f2,0x560,80);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 

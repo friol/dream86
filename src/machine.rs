@@ -244,6 +244,12 @@ impl machine
                 // TODO
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x1c00
+            {
+                // INT 10,1C - Save/Restore Video State (VGA only)
+                // TODO
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");

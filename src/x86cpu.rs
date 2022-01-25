@@ -322,6 +322,10 @@ impl x86cpu
                 let theAddr:i32=(self.bx as i32)+(self.decInstr.displacement as i32);
                 dst=theAddr as u16;
             }
+            else if operand1=="[DI]"
+            {
+                dst=self.di;
+            }
             else if operand1.contains("[DI+Disp]")
             {
                 let theAddr:i32=(self.di as i32)+(self.decInstr.displacement as i32);
@@ -340,6 +344,13 @@ impl x86cpu
             else if operand1=="[BX+DI]" 
             { 
                 let mut offs32:i32=self.bx as i32;
+                offs32+=self.di as i32;
+                offs32&=0xffff;
+                dst=offs32 as u16;
+            }
+            else if operand1=="[BP+DI]" 
+            { 
+                let mut offs32:i32=self.bp as i32;
                 offs32+=self.di as i32;
                 offs32&=0xffff;
                 dst=offs32 as u16;
@@ -480,7 +491,22 @@ impl x86cpu
 
         if self.decInstr.instrSize==16
         {
-            self.abort("unimplemented 16 bit ror");
+            let mut val2shift:u16=self.getOperandValue(&operand1,pmachine,pvga);
+
+            for _idx in 0..shiftAmount
+            {
+                let lastBit=val2shift&0x01;
+                if lastBit==1 { self.setCflag(true); }                
+                else { self.setCflag(false); }
+                val2shift>>=1;
+                val2shift=(val2shift&0x7fff)|(lastBit<<15);
+            }
+
+            self.moveToDestination(&val2shift,&operand1,pmachine,pvga);
+
+            self.doZflag(val2shift as u16);
+            self.doPflag(val2shift as u16);
+            self.doSflag(val2shift as u16,self.decInstr.instrSize);
         }
         else
         {
@@ -991,6 +1017,11 @@ impl x86cpu
         {
             destAddr=pmachine.readMemory16(readSeg,self.di,pvga);
             destSeg=pmachine.readMemory16(readSeg,self.di+2,pvga);
+        }
+        else if operand1=="[SI]"
+        {
+            destAddr=pmachine.readMemory16(readSeg,self.si,pvga);
+            destSeg=pmachine.readMemory16(readSeg,self.si+2,pvga);
         }
         else if operand1.contains("[BX+Disp]")
         {
@@ -2097,6 +2128,35 @@ impl x86cpu
             if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
             else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
         }
+        else if dstReg.contains("[BP+SI]")
+        {
+            let mut writeSeg:u16=self.ss;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+
+            let mut di32:i32=self.bp as i32;
+            di32+=self.si as i32;
+
+            if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
+            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
+        }
+        else if dstReg.contains("[BP+DI+Disp]")
+        {
+            let mut writeSeg:u16=self.ss;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+
+            let mut di32:i32=self.bp as i32;
+            di32+=self.di as i32;
+            di32+=self.decInstr.displacement;
+
+            if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
+            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
+        }
         else
         {
             self.abort(&format!("Unhandled moveToDestination {} {} at {:04x}",dstReg,srcVal,self.ip));
@@ -2270,42 +2330,17 @@ impl x86cpu
 
     fn doSbb(&mut self,srcVal:&u16,dstReg:&String,pmachine:&mut machine,pvga:&mut vga)
     {
-        let mut result:u16=0;
         let op1=*srcVal;        
         let lop=self.getOperandValue(&dstReg,pmachine,pvga);
 
         let mut cf=0;
         if self.getCflag() { cf=1; }
 
-        if lop>op1 
-        { 
-            self.moveToDestination(&(0xffff-lop+1-cf),&dstReg,pmachine,pvga); 
-            if result==0 { result=0xffff-op1+1-cf; }
-        }
-        else 
-        {
-            if cf==0 
-            { 
-                self.moveToDestination(&(op1-lop),&dstReg,pmachine,pvga); 
-                if result==0 { result=op1-lop-cf; }
-            }
-            else 
-            { 
-                if self.decInstr.instrSize==16
-                {
-                    self.moveToDestination(&(0xffff),&dstReg,pmachine,pvga); 
-                    if result==0 { result=0xffff; }
-                }
-                else
-                {
-                    self.moveToDestination(&(0xff),&dstReg,pmachine,pvga); 
-                    if result==0 { result=0xff; }
-                }
-            } 
-        }
-
         if self.decInstr.instrSize==16
         {
+            let mut result:u16=lop.wrapping_sub(op1);
+            result=result.wrapping_sub(cf);
+            self.moveToDestination(&result,&dstReg,pmachine,pvga); 
             if (result&0x8000)==0x8000
             {
                 self.setCflag(true);
@@ -2314,10 +2349,18 @@ impl x86cpu
             {
                 self.setCflag(false);
             }
+            self.doSflag(result,self.decInstr.instrSize);
+            self.doZflag(result);
+            self.doPflag(result);
         }
         else if self.decInstr.instrSize==8
         {
-            if (result&0x80)==0x80
+            let op18:u8=(op1&0xff) as u8;
+            let lop8:u8=(lop&0xff) as u8;
+            let mut result8:u8=lop8.wrapping_sub(op18);
+            result8=result8.wrapping_sub(cf as u8);
+            self.moveToDestination(&(result8 as u16),&dstReg,pmachine,pvga); 
+            if (result8&0x80)==0x80
             {
                 self.setCflag(true);
             }        
@@ -2325,11 +2368,10 @@ impl x86cpu
             {
                 self.setCflag(false);
             }
+            self.doSflag(result8 as u16,self.decInstr.instrSize);
+            self.doZflag(result8 as u16);
+            self.doPflag(result8 as u16);
         }
-
-        self.doSflag(result,self.decInstr.instrSize);
-        self.doZflag(result);
-        self.doPflag(result);
     }
 
     fn doXor(&mut self,srcVal:&u16,dstReg:&String,pmachine:&mut machine,pvga:&mut vga)
@@ -2489,6 +2531,11 @@ impl x86cpu
         {
             // write r-g-b for VGA palette
             pvga.write0x3c9((self.ax&0xff) as u8);
+        }
+        else if (self.decInstr.u8immediate==0x20) || (self.decInstr.u16immediate==0x20)
+        {
+            // MPICP0
+            //self.abort(&format!("Write to 0x20 PIC {:02x}",self.ax&0xff));
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -2778,6 +2825,7 @@ impl x86cpu
             0xa3 => { return ["MOV","16","2","AX","Direct Addr","MovNMRR","0"]; }
             // AND instructions
             0x20 => { return ["AND","8","2","rmb","rb","And","0"]; }
+            0x21 => { return ["AND","16","2","rw","rmw","And","0"]; }
             0x22 => { return ["AND","8","2","rb","rmb","And","1"]; }
             0x23 => { return ["AND","16","2","rw","rmw","And","1"]; }
             0x24 => { return ["AND","8","2","ib","AL","AndNMRR","0"]; }
@@ -2791,9 +2839,9 @@ impl x86cpu
             0x0D => { return ["OR","16","2","iw","AX","OrNMRR","0"]; }
             // XOR instructions
             0x30 => { return ["XOR","8","2","rb","rmb","Xor","1"]; }
-            0x31 => { return ["XOR","16","2","rmw","rw","Xor","1"]; }
+            0x31 => { return ["XOR","16","2","rmw","rw","Xor","0"]; }
             0x32 => { return ["XOR","8","2","rb","rmb","Xor","1"]; }
-            0x33 => { return ["XOR","16","2","rw","rmw","Xor","1"]; }
+            0x33 => { return ["XOR","16","2","rw","rmw","Xor","1"]; } // right or inverted?
             0x34 => { return ["XOR","8","2","ib","AL","XorNMRR","1"]; }
             0x35 => { return ["XOR","16","2","iw","AX","XorNMRR","1"]; }
             // XLAT
@@ -2814,12 +2862,13 @@ impl x86cpu
             // ADC
             0x10 => { return ["ADC","8","2","rb","rmb","Adc","0"]; }
             0x11 => { return ["ADC","16","2","rw","rmw","Adc","0"]; }
+            0x12 => { return ["ADC","8","2","rb","rmb","Adc","0"]; }
             0x13 => { return ["ADC","16","2","rw","rmw","Adc","0"]; }
             // CMP
-            0x3b => { return ["CMP","16","2","rmw","rw","Cmp","1"]; }
             0x38 => { return ["CMP","8","2","rmb","rb","Cmp","0"]; }
             0x39 => { return ["CMP","16","2","rmw","rw","Cmp","0"]; }
             0x3a => { return ["CMP","8","2","rmb","rb","Cmp","1"]; }
+            0x3b => { return ["CMP","16","2","rmw","rw","Cmp","1"]; }
             0x3c => { return ["CMP","8","2","ib","AL","CmpNMRR","0"]; }
             0x3d => { return ["CMP","16","2","iw","AX","CmpNMRR","0"]; } // the 3-D instruction
             // SUB
@@ -2883,14 +2932,15 @@ impl x86cpu
             0x8007 => { return ["CMP","8","2","ib","rmb","Cmp","0"]; }
             
             0x8100 => { return ["ADD","16","2","iw","rmw","Add","0"]; }
-            0x8101 => { return ["OR","16","2","iw","rmw","Or","0"]; }
+            0x8101 => { return ["OR" ,"16","2","iw","rmw","Or" ,"0"]; }
+            0x8102 => { return ["ADC","16","2","iw","rmw","Adc","0"]; }
             0x8104 => { return ["AND","16","2","iw","rmw","And","0"]; }
             0x8105 => { return ["SUB","16","2","iw","rmw","Sub","0"]; }
             0x8106 => { return ["XOR","16","2","iw","rmw","Xor","0"]; }
             0x8107 => { return ["CMP","16","2","iw","rmw","Cmp","0"]; }
 
             0x8300 => { return ["ADD","16","2","eb","rmw","Add","0"]; }
-            0x8301 => { return ["OR","16","2","eb","rmw","Or","0"]; }
+            0x8301 => { return ["OR" ,"16","2","eb","rmw","Or" ,"0"]; }
             0x8302 => { return ["ADC","16","2","eb","rmw","Adc","0"]; }
             0x8303 => { return ["SBB","16","2","eb","rmw","Sbb","0"]; }
             0x8304 => { return ["AND","16","2","eb","rmw","And","0"]; }
@@ -2911,6 +2961,8 @@ impl x86cpu
             0xd004 => { return ["SHL","8","2","rmb","1","Shl","1"]; }
             0xd005 => { return ["SHR","8","2","rmb","1","Shr","1"]; }
 
+            0xd100 => { return ["ROL","16","2","rmw","1","Rol","1"]; }            
+            0xd101 => { return ["ROR","16","2","rmw","1","Ror","1"]; }            
             0xd102 => { return ["RCL","16","2","rmw","1","Rcl","1"]; }            
             0xd103 => { return ["RCR","16","2","rmw","1","Rcr","1"]; }            
             0xd104 => { return ["SHL","16","1","rmw","1","Shl","1"]; }            
@@ -2919,14 +2971,16 @@ impl x86cpu
 
             0xd204 => { return ["SHL","8","2","rmb","CL","Shl","1"]; }
             0xd205 => { return ["SHR","8","2","rmb","CL","Shr","1"]; }            
+            0xd207 => { return ["SAR","8","2","rmb","CL","Sar","1"]; }            
 
             0xd300 => { return ["ROL","16","2","rmw","CL","Rol","1"]; }            
+            0xd301 => { return ["ROR","16","2","rmw","CL","Ror","1"]; }            
             0xd304 => { return ["SHL","16","2","rmw","CL","Shl","1"]; }            
             0xd305 => { return ["SHR","16","2","rmw","CL","Shr","1"]; }            
 
             0xf600 => { return ["TEST","8","2","ib","rmb","Test","0"]; }
-            0xf602 => { return ["NOT","8","1","rmb","","Not","0"]; }
-            0xf603 => { return ["NEG","8","1","rmb","","Neg","0"]; }
+            0xf602 => { return ["NOT","8","1","rmb","","Not","1"]; }
+            0xf603 => { return ["NEG","8","1","rmb","","Neg","1"]; }
             0xf604 => { return ["MUL","8","1","rmb","","Mul","1"]; }
             0xf605 => { return ["IMUL","8","1","rmb","","Imul","1"]; }
             0xf606 => { return ["DIV","8","1","rmb","","Div","1"]; }
@@ -3337,6 +3391,11 @@ impl x86cpu
         {
             canDecode=true;
 
+            if wideOpcode==0xf603
+            {
+                //self.abort(&format!("Neg! at {:04x}:{:04x}",self.cs,self.ip));
+            }
+
             let mut dbgDec:String=String::from("");
             if segOverride!="" { dbgDec.push_str(&format!("{} ",segOverride)); } 
             if repOverride!="" { dbgDec.push_str(&format!("{} ",repOverride)); }
@@ -3563,18 +3622,21 @@ impl x86cpu
             // INT nn
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
-            if (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) || (intNum==131)
+            if (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) || (intNum==0x28) || (intNum==131)
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
                 let newcs=pmachine.readMemory16(0x0,((intNum as u16)*4)+2,pvga);
 
                 pmachine.push16(self.flags,self.ss,self.sp);
                 self.sp-=2;
+                self.setTflag(false);
+                self.setIflag(false);
+
                 pmachine.push16(self.cs,self.ss,self.sp);
                 self.sp-=2;
                 pmachine.push16(self.ip+2,self.ss,self.sp);
                 self.sp-=2;
-                    
+               
                 self.cs=newcs;
                 self.ip=newip;
 
@@ -3868,6 +3930,30 @@ impl x86cpu
     //
     //
     //
+
+    fn setIflag(&mut self,val:bool)
+    {
+        if val
+        {
+            self.flags|=1<<9;
+        }
+        else
+        {
+            self.flags&=!(1<<9);
+        }
+    }
+
+    fn setTflag(&mut self,val:bool)
+    {
+        if val
+        {
+            self.flags|=1<<8;
+        }
+        else
+        {
+            self.flags&=!(1<<8);
+        }
+    }
 
     fn setPflag(&mut self,val:bool)
     {
