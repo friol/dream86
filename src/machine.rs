@@ -100,6 +100,24 @@ impl machine
             let num:u16 = rand::thread_rng().gen_range(0..256);
             pcpu.ax=(pcpu.ax&0xff00)|num;    
         }
+        else if addr8==0x60
+        {
+            // read key pressed
+            if self.keyboardQueue.len()>0
+            {
+                let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
+                self.keyboardQueue.pop();
+                pcpu.ax=(pcpu.ax&0xff00)|(scanCode&0xff);
+            }
+            else
+            {
+                pcpu.ax=pcpu.ax&0xff00;
+            }
+        }
+        else if addr8==0x61
+        {
+            pcpu.ax=pcpu.ax&0xff00;
+        }
         else if addr16==0x3da
         {
             // CGA status register	EGA/VGA: input status 1 register
@@ -244,9 +262,21 @@ impl machine
                 // TODO
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x1b00
+            {
+                // INT 10,1B - Video BIOS Functionality and State Information (MCGA/VGA)
+                // TODO
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x1c00
             {
                 // INT 10,1C - Save/Restore Video State (VGA only)
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0xef00
+            {
+                // unknown, called from Qbasic
                 // TODO
                 return true;
             }
@@ -751,15 +781,16 @@ impl machine
         }
     }
 
-    pub fn update(&mut self)
+    pub fn update(&mut self,pcpu:&mut x86cpu)
     {
         // todo: update 18.206 times per second
-        // assume 100.000 instructions per seconds
+        // assume 200.000 instructions per seconds
         self.internalClockTicker+=1;
-        if self.internalClockTicker>=5555
+        if self.internalClockTicker>=10000
         {
             self.internalClockTicker=0;
             self.clockTicker+=1;
+            pcpu.triggerHwIrq(8);
         }
     }
 

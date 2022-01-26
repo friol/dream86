@@ -135,8 +135,10 @@ impl guiif
         return self.videoWindow.is_key_down(Key::Escape);
     }
 
-    pub fn processKeys(&mut self,pmachine:&mut machine)
+    pub fn processKeys(&mut self,pmachine:&mut machine,theCPU:&mut x86cpu,_pvga:&mut vga) -> bool
     {
+        let mut kpress=false;
+
         if self.checkLShiftPressed()
         {
             pmachine.addKeystroke(0xff);
@@ -171,31 +173,36 @@ impl guiif
                 Key::Y => pmachine.addKeystroke(0x79),
                 Key::Z => pmachine.addKeystroke(0x7a),
                 Key::Key0 => pmachine.addKeystroke(0x30),
-                Key::Key1 => pmachine.addKeystroke(0x0231),
-                Key::Key2 => pmachine.addKeystroke(0x32),
-                Key::Key3 => pmachine.addKeystroke(0x33),
-                Key::Key4 => pmachine.addKeystroke(0x34),
-                Key::Key5 => pmachine.addKeystroke(0x35),
-                Key::Key6 => pmachine.addKeystroke(0x36),
-                Key::Key7 => pmachine.addKeystroke(0x37),
-                Key::Key8 => pmachine.addKeystroke(0x38),
-                Key::Key9 => pmachine.addKeystroke(0x39),
-                Key::F1 => pmachine.addKeystroke(0x3b00), 
-                Key::Space => pmachine.addKeystroke(0x3920),
+                Key::Key1 => { pmachine.addKeystroke(0x3100); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key2 => { pmachine.addKeystroke(0x3200); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key3 => { pmachine.addKeystroke(0x3300); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key4 => { pmachine.addKeystroke(0x3400); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key5 => { pmachine.addKeystroke(0x3500); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key6 => { pmachine.addKeystroke(0x3600); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key7 => { pmachine.addKeystroke(0x3700); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key8 => { pmachine.addKeystroke(0x3800); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::Key9 => { pmachine.addKeystroke(0x3900); theCPU.triggerHwIrq(9); kpress=true; },
+                Key::F1 => { pmachine.addKeystroke(0x3b00); theCPU.triggerHwIrq(9); kpress=true; }, 
+                Key::F2 => { pmachine.addKeystroke(0x3c00); theCPU.triggerHwIrq(9); kpress=true; }, 
+                Key::F3 => { pmachine.addKeystroke(0x3d00); theCPU.triggerHwIrq(9); kpress=true; }, 
+                Key::F4 => { pmachine.addKeystroke(0x3e00); theCPU.triggerHwIrq(9); kpress=true; }, 
+                Key::Space => { pmachine.addKeystroke(0x3920); theCPU.triggerHwIrq(9); kpress=true; },
                 Key::Period => pmachine.addKeystroke(0x342e),
                 Key::NumPadAsterisk => pmachine.addKeystroke(0x372a),
                 Key::Backspace => pmachine.addKeystroke(0x0e08),
                 Key::NumPadPlus => pmachine.addKeystroke(0x2b),
                 Key::Minus => pmachine.addKeystroke(0x2d),
-                Key::Enter => pmachine.addKeystroke(0x1c0d),
-                Key::Up => pmachine.addKeystroke(0x4800),
-                Key::Down => pmachine.addKeystroke(0x5000),
+                Key::Enter => { pmachine.addKeystroke(0x0d); theCPU.triggerHwIrq(9); }, 
+                Key::Up => { pmachine.addKeystroke(0x4800); theCPU.triggerHwIrq(9); }, 
+                Key::Down => { pmachine.addKeystroke(0x5000); theCPU.triggerHwIrq(9); }, 
                 Key::Left => pmachine.addKeystroke(0x4b00),
                 Key::Right => pmachine.addKeystroke(0x4d00),
                 Key::NumPadSlash => pmachine.addKeystroke(47),
-                _ => return,
+                _ => return ,
             }
         });
+
+        return kpress;
     }
 
     pub fn checkLShiftPressed(&mut self) -> bool

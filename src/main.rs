@@ -47,15 +47,16 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dirtest.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string()); // flr.exe, arkanoid
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // zaxxon, mach3
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string());
-    let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string());
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string()); // pop, sq1
+    let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games8.img".to_string()); // popcorn, monuments of mars
     //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // jumpfar bp+disp
     //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string()); // unhandled opcode sbb 1c
+    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string());
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
@@ -82,7 +83,7 @@ fn main()
         {
             let mut bytesRead=0;
             theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-            theMachine.update();
+            theMachine.update(&mut theCPU);
         }
         else if act==guiif::keyAction::actionRunToRet
         {
@@ -96,7 +97,7 @@ fn main()
             while (bytesRead!=0) && (!stopit)
             {
                 _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update();
+                theMachine.update(&mut theCPU);
 
                 if (iterations%1000)==0
                 {
@@ -141,7 +142,7 @@ fn main()
             while theCPU.ip!=bpPos
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update();
+                theMachine.update(&mut theCPU);
             }
         }
         else if act==guiif::keyAction::actionRun
@@ -153,7 +154,7 @@ fn main()
             while !bailOut
             {
                 let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update();
+                theMachine.update(&mut theCPU);
                 inum+=1;
 
                 //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
@@ -171,8 +172,7 @@ fn main()
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x12d)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x3d47)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
-                //if (theCPU.cs==0xd08) && (theCPU.ip==0x11c8)
-                //if (theCPU.cs==0x0dfb) && (theCPU.ip==0x675c)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0103)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x5cb7)
                 //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
                 if false
@@ -215,7 +215,10 @@ fn main()
                         bailOut=true;
                     }
 
-                    theGUI.processKeys(&mut theMachine);
+                    if theGUI.processKeys(&mut theMachine,&mut theCPU,&mut theVGA)
+                    {
+                        //bailOut=true;
+                    }
                     
                     //thread::sleep(time::Duration::from_millis(4));                    
                     inum=0;
