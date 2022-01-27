@@ -2576,28 +2576,9 @@ impl x86cpu
         self.ip+=self.decInstr.insLen as u16;
     }
 
-    fn performOut(&mut self,_pmachine:&mut machine,pvga:&mut vga)
+    fn performOut(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        if self.decInstr.u16immediate==0x03C6
-        {
-            // VGA palette mask
-            // TODO
-        }
-        else if self.decInstr.u16immediate==0x03C8
-        {
-            // set palette color index for VGA
-            pvga.write0x3c8((self.ax&0xff) as u8);
-        }
-        else if self.decInstr.u16immediate==0x03C9
-        {
-            // write r-g-b for VGA palette
-            pvga.write0x3c9((self.ax&0xff) as u8);
-        }
-        else if (self.decInstr.u8immediate==0x20) || (self.decInstr.u16immediate==0x20)
-        {
-            // MPICP0
-            //self.abort(&format!("Write to 0x20 PIC {:02x}",self.ax&0xff));
-        }
+        pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,self.decInstr.instrSize);
 
         self.ip+=self.decInstr.insLen as u16;
     }

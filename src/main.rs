@@ -23,7 +23,7 @@ mod guiif;
 
 fn main()
 {
-    let mut _breakIt=false;
+    let mut _breakIt=true;
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
 
     //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,1);
@@ -50,9 +50,9 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string()); // flr.exe, arkanoid
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // zaxxon, mach3
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string());
+    let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string()); // pop, sq1
-    let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games8.img".to_string()); // popcorn, monuments of mars
     //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // jumpfar bp+disp
     //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
@@ -83,7 +83,7 @@ fn main()
         {
             let mut bytesRead=0;
             theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-            theMachine.update(&mut theCPU);
+            theMachine.update(&mut theCPU,_breakIt);
         }
         else if act==guiif::keyAction::actionRunToRet
         {
@@ -97,7 +97,7 @@ fn main()
             while (bytesRead!=0) && (!stopit)
             {
                 _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update(&mut theCPU);
+                theMachine.update(&mut theCPU,_breakIt);
 
                 if (iterations%1000)==0
                 {
@@ -142,7 +142,7 @@ fn main()
             while theCPU.ip!=bpPos
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update(&mut theCPU);
+                theMachine.update(&mut theCPU,_breakIt);
             }
         }
         else if act==guiif::keyAction::actionRun
@@ -154,7 +154,7 @@ fn main()
             while !bailOut
             {
                 let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
-                theMachine.update(&mut theCPU);
+                theMachine.update(&mut theCPU,_breakIt);
                 inum+=1;
 
                 //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here

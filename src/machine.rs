@@ -93,6 +93,30 @@ impl machine
         self.keyboardQueue.push(ks);
     }
 
+    pub fn handleOut(&mut self,pcpu:&mut x86cpu,pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
+    {
+        if addr16==0x03C6
+        {
+            // VGA palette mask
+            // TODO
+        }
+        else if addr16==0x03C8
+        {
+            // set palette color index for VGA
+            pvga.write0x3c8((pcpu.ax&0xff) as u8);
+        }
+        else if addr16==0x03C9
+        {
+            // write r-g-b for VGA palette
+            pvga.write0x3c9((pcpu.ax&0xff) as u8);
+        }
+        else if (addr8==0x20) || (addr16==0x20)
+        {
+            // MPICP0
+            //self.abort(&format!("Write to 0x20 PIC {:02x}",self.ax&0xff));
+        }
+    }
+
     pub fn handleIn(&mut self,pcpu:&mut x86cpu,_pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
     {
         if addr8==0x40
@@ -107,7 +131,7 @@ impl machine
             {
                 let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
                 self.keyboardQueue.pop();
-                pcpu.ax=(pcpu.ax&0xff00)|(scanCode&0xff);
+                pcpu.ax=(pcpu.ax&0xff00)|(scanCode>>8);
             }
             else
             {
@@ -606,7 +630,7 @@ impl machine
                 {
                     pcpu.setZflag(false);   
                     let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
-                    pcpu.ax=scanCode; // (scanCode as u16)<<8;
+                    pcpu.ax=scanCode;
                 }
                 return true;
             }
@@ -781,7 +805,7 @@ impl machine
         }
     }
 
-    pub fn update(&mut self,pcpu:&mut x86cpu)
+    pub fn update(&mut self,pcpu:&mut x86cpu,fireIrq:bool)
     {
         // todo: update 18.206 times per second
         // assume 200.000 instructions per seconds
@@ -790,7 +814,7 @@ impl machine
         {
             self.internalClockTicker=0;
             self.clockTicker+=1;
-            pcpu.triggerHwIrq(8);
+            if fireIrq { pcpu.triggerHwIrq(8); }
         }
     }
 
