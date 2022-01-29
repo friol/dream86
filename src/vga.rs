@@ -260,15 +260,15 @@ impl vga
     {
         if self.vgaPaletteIndexRGB==0
         {
-            self.vgaPalette[self.vgaPaletteCurColor as usize]=self.vgaPalette[self.vgaPaletteCurColor as usize]&(val as u32);
+            self.vgaPalette[self.vgaPaletteCurColor as usize]=(self.vgaPalette[self.vgaPaletteCurColor as usize]&0xffff00)|((val<<2) as u32);
         }
         else if self.vgaPaletteIndexRGB==1
         {
-            self.vgaPalette[self.vgaPaletteCurColor as usize]=self.vgaPalette[self.vgaPaletteCurColor as usize]&((val as u32)<<8);
+            self.vgaPalette[self.vgaPaletteCurColor as usize]=(self.vgaPalette[self.vgaPaletteCurColor as usize]&0xff00ff)|(((val<<2) as u32)<<8);
         }
         else
         {
-            self.vgaPalette[self.vgaPaletteCurColor as usize]=self.vgaPalette[self.vgaPaletteCurColor as usize]&((val as u32)<<16);
+            self.vgaPalette[self.vgaPaletteCurColor as usize]=(self.vgaPalette[self.vgaPaletteCurColor as usize]&0x00ffff)|(((val<<2) as u32)<<16);
         }
 
         self.vgaPaletteIndexRGB+=1;

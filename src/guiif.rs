@@ -298,12 +298,17 @@ impl guiif
 
         let mut stdout = stdout();
 
+        let ln=theMachine.stackey.len();
+
         let mut ii=0;
         for el in &theMachine.stackey
         {
-            stdout.queue(cursor::MoveTo(80,ii)).ok();
-            let ss:String=format!("{:02x}",el);
-            stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
+            if (ln>20) && (ii>(ln-5))
+            {
+                stdout.queue(cursor::MoveTo(80,(ii-ln+5) as u16)).ok();
+                let ss:String=format!("{:02x}",el);
+                stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
+            }
             ii+=1;
         }
 

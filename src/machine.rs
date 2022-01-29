@@ -68,8 +68,7 @@ impl machine
 
     fn loadBinFile(mem:&mut Vec<u8>,fname:&str)
     {
-        // Load image into F000:0000
-        let comBase:usize=0xF0000;
+        let comBase:usize=0xf0000;
         
         let mut f = match File::open(fname) {
             Ok(f) => f,
@@ -708,12 +707,14 @@ impl machine
 
     pub fn push16(&mut self,val:u16,segment:u16,address:u16)
     {
-        let i64seg:i64=segment.into();
-        let i64addr:i64=address.into();
-        let flatAddr:i64=i64addr+(i64seg*16);
+        let seg:u16=segment;
+        let mut ofs:u16=address.wrapping_sub(1);
+        let flatAddrm1:i64=(ofs as i64)+((seg as i64)*16);
+        ofs=ofs.wrapping_sub(1);
+        let flatAddrm2:i64=(ofs as i64)+((seg as i64)*16);
 
-        self.ram[(flatAddr-2) as usize]=(val&0xff) as u8;
-        self.ram[(flatAddr-1) as usize]=((val>>8)&0xff) as u8;
+        self.ram[(flatAddrm2) as usize]=(val&0xff) as u8;
+        self.ram[(flatAddrm1) as usize]=((val>>8)&0xff) as u8;
 
         self.stackey.push((val&0xff) as u8);
         self.stackey.push(((val>>8)&0xff) as u8);
@@ -724,11 +725,12 @@ impl machine
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr+(i64seg*16);
+        let flatAddrp1:i64=((i64addr+1)&0xffff)+(i64seg*16);
 
         let mut retval:u16=0;
 
         retval|=self.ram[(flatAddr) as usize] as u16;
-        let mut upperPart:u16=self.ram[(flatAddr+1) as usize].into();
+        let mut upperPart:u16=self.ram[flatAddrp1 as usize].into();
         upperPart<<=8;
         retval|=upperPart;
 
@@ -805,7 +807,7 @@ impl machine
         }
     }
 
-    pub fn update(&mut self,pcpu:&mut x86cpu,fireIrq:bool)
+    pub fn update(&mut self,pcpu:&mut x86cpu)
     {
         // todo: update 18.206 times per second
         // assume 200.000 instructions per seconds
@@ -814,7 +816,7 @@ impl machine
         {
             self.internalClockTicker=0;
             self.clockTicker+=1;
-            if fireIrq { pcpu.triggerHwIrq(8); }
+            pcpu.triggerHwIrq(8);
         }
     }
 
