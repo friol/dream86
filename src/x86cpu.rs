@@ -4,11 +4,10 @@
     our mythical 8086 cpu - dream86 2o22 
 
     TODO:
-    - the big rewrite part 2: generic get/set registers/addresses
     - rewrite all the get/set flags functions as one
     - wrap around registers everywhere
     - unify lds, les, etc.
-    - auxiliary flag
+    - auxiliary flag in cmps and scas
     - overflow flag
     - test IDIV!!!
     
@@ -62,6 +61,7 @@ pub enum instructionType
     instrScas,
     instrCmps,
     instrJmpShort,
+    instrJmpNear,
     instrJmpNp,
     instrInt,
     instrCallRel16,
@@ -348,6 +348,11 @@ impl x86cpu
             else if operand1.contains("[SI+Disp]")
             {
                 let theAddr:i32=(self.si as i32)+(self.decInstr.displacement as i32);
+                dst=theAddr as u16;
+            }
+            else if operand1.contains("[BX+Disp]")
+            {
+                let theAddr:i32=(self.bx as i32)+(self.decInstr.displacement as i32);
                 dst=theAddr as u16;
             }
             else if operand1.contains("[BP+Disp]")
@@ -1214,8 +1219,16 @@ impl x86cpu
                 {
                     let dataw=pmachine.readMemory16(readSeg,self.si,pvga);
                     pmachine.writeMemory16(self.es,self.di,dataw,pvga);
-                    if self.getDflag() { self.si-=inc; self.di-=inc; }
-                    else { self.si+=inc; self.di+=inc; }
+                    if self.getDflag() 
+                    { 
+                        self.si=self.si.wrapping_sub(inc);
+                        self.di=self.di.wrapping_sub(inc);
+                    }
+                    else 
+                    { 
+                        self.si=self.si.wrapping_add(inc);
+                        self.di=self.di.wrapping_add(inc);
+                    }
                 }
                 else if self.decInstr.instrSize==8
                 {
@@ -1325,7 +1338,7 @@ impl x86cpu
     // the instruction that scas'd everything
     fn performScas(&mut self,pmachine:&machine,pvga:&vga)
     {
-        let mut readSeg:u16=self.es; // TODO check
+        let mut readSeg:u16=self.es;
         if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
         else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
         else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
@@ -1336,35 +1349,77 @@ impl x86cpu
             self.abort("Unhandled seg override in SCAS");
         }
 
-        if (self.decInstr.repPrefix=="REPE") && (self.decInstr.instrSize==16)
-        {
-            self.abort(&format!("Unhandled rep prefix REPE in SCAS at {:04x}:{:04x} {} bits",self.cs,self.ip,self.decInstr.instrSize));
-        }
-
         if self.decInstr.instrSize==16
         {
             if self.decInstr.repPrefix=="REPNE"
             {
-                self.abort("Unhandled rep prefix REPNE in SCAS 16 bit");
-            }
+                if self.cx!=0
+                {
+                    let dataw:i32=pmachine.readMemory16(readSeg,self.di,pvga) as i32;
+
+                    let axi32=self.ax as i32;
+                    let result:i32=axi32-dataw;
     
-            // TODO REVIEW
-            let dataw:i32=pmachine.readMemory16(readSeg,self.di,pvga) as i32;
+                    self.doZflag(result as u16);
+                    self.doPflag(result as u16);
+                    self.doSflag(result as u16,self.decInstr.instrSize);
+                    self.doCflag(result as u16,self.decInstr.instrSize);
+            
+                    if self.getDflag() { self.di-=2; }
+                    else { self.di+=2; }
 
-            let axi32=self.ax as i32;
-            let result:i32=axi32-dataw;
+                    self.cx-=1;
+                    if result==0 { self.ip+=self.decInstr.insLen as u16; return; }
+                }
+                else
+                {
+                    self.ip+=self.decInstr.insLen as u16;
+                }
+            }
+            else if self.decInstr.repPrefix=="REPE"
+            {
+                if self.cx!=0
+                {
+                    let dataw:i32=pmachine.readMemory16(readSeg,self.di,pvga) as i32;
 
-            self.doZflag(result as u16);
-            self.doPflag(result as u16);
-            self.doSflag(result as u16,self.decInstr.instrSize);
-            self.doCflag(result as u16,self.decInstr.instrSize);
+                    let axi32=self.ax as i32;
+                    let result:i32=axi32-dataw;
+    
+                    self.doZflag(result as u16);
+                    self.doPflag(result as u16);
+                    self.doSflag(result as u16,self.decInstr.instrSize);
+                    self.doCflag(result as u16,self.decInstr.instrSize);
+            
+                    if self.getDflag() { self.di-=2; }
+                    else { self.di+=2; }
 
-            if self.getDflag() { self.di-=2; }
-            else { self.di+=2; }
+                    self.cx-=1;
+                    if result!=0 { self.ip+=self.decInstr.insLen as u16; return; }
+                }
+                else
+                {
+                    self.ip+=self.decInstr.insLen as u16;
+                }
+            }
+            else if self.decInstr.repPrefix==""
+            {
+                let dataw:i32=pmachine.readMemory16(readSeg,self.di,pvga) as i32;
 
-            self.ip+=self.decInstr.insLen as u16;
+                let axi32=self.ax as i32;
+                let result:i32=axi32-dataw;
+
+                self.doZflag(result as u16);
+                self.doPflag(result as u16);
+                self.doSflag(result as u16,self.decInstr.instrSize);
+                self.doCflag(result as u16,self.decInstr.instrSize);
+
+                if self.getDflag() { self.di-=2; }
+                else { self.di+=2; }
+
+                self.ip+=self.decInstr.insLen as u16;
+            }
         }
-        else 
+        else if self.decInstr.instrSize==8
         {
             if self.decInstr.repPrefix=="REPNE"
             {
@@ -1601,9 +1656,19 @@ impl x86cpu
         self.ip+=self.decInstr.insLen as u16;
     }
 
-    fn performJmpShort(&mut self)
+    fn performJmp(&mut self)
     {
-        let jumpAmt=self.decInstr.operand1.parse::<i8>().unwrap() as i16;
+        let mut jumpAmt=0;
+        
+        if (self.decInstr.instrSize==8) && (jumpAmt==0)
+        {
+            jumpAmt=self.decInstr.operand1.parse::<i8>().unwrap() as i16;
+        }
+        else
+        {
+            jumpAmt=self.decInstr.operand1.parse::<i16>().unwrap() as i16;
+        }
+
         let mut performJump:bool=false;
 
         if &self.decInstr.debugDecode[0..3]=="JBE" 
@@ -1676,7 +1741,7 @@ impl x86cpu
         }
         else
         {
-            self.ip+=2;
+            self.ip+=self.decInstr.insLen as u16;
         }
     }
 
@@ -2236,6 +2301,21 @@ impl x86cpu
             if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
             else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
         }
+        else if dstReg.contains("[BX+SI+Disp]")
+        {
+            let mut writeSeg:u16=self.ds;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+
+            let mut di32:i32=self.bx as i32;
+            di32+=self.si as i32;
+            di32+=self.decInstr.displacement;
+
+            if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
+            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
+        }
         else if dstReg.contains("[BP+DI]")
         {
             let mut writeSeg:u16=self.ss;
@@ -2720,6 +2800,7 @@ impl x86cpu
         else if it=="Scas" { return instructionType::instrScas; }
         else if it=="Cmps" { return instructionType::instrCmps; }
         else if it=="JmpShort" { return instructionType::instrJmpShort; }
+        else if it=="JmpNear" { return instructionType::instrJmpNear; }
         else if it=="JmpNp" { return instructionType::instrJmpNp; }
         else if it=="Int" { return instructionType::instrInt; }
         else if it=="CallReg" { return instructionType::instrCallReg; }
@@ -3028,7 +3109,7 @@ impl x86cpu
             // another PUSH
             0x68 => { return ["PUSH","16","1","iw","","PushNMRR","0"]; }
             // another PUSH TODO
-            /*0x6a => { return ["PUSH","16","1","eb","","PushNMRR","0"]; }*/
+            0x6a => { return ["PUSH","16","1","eb","","PushNMRR","0"]; }
             // RETiw
             0xc2 => { return ["RETIW","16","1","iw","","Retiw","0"]; }
             // RETF iw
@@ -3072,6 +3153,8 @@ impl x86cpu
             0x8105 => { return ["SUB","16","2","iw","rmw","Sub","0"]; }
             0x8106 => { return ["XOR","16","2","iw","rmw","Xor","0"]; }
             0x8107 => { return ["CMP","16","2","iw","rmw","Cmp","0"]; }
+
+            0x8207 => { return ["CMP","16","2","ib","rmw","Cmp","0"]; }
 
             0x8300 => { return ["ADD","16","2","eb","rmw","Add","0"]; }
             0x8301 => { return ["OR" ,"16","2","eb","rmw","Or" ,"0"]; }
@@ -3145,6 +3228,8 @@ impl x86cpu
             0xdbe3 => { return ["FNINIT","8","0","","","Fninit","1"]; }
             0xdd3e => { return ["FNSTSW","8","0","","","Fnstsw","1"]; }
 
+            0x0f82 => { return ["JB","16","0","","","JmpNear","0"]; }
+
             _ => { *found=false; }
         }
 
@@ -3168,6 +3253,19 @@ impl x86cpu
             *opsrc=delta.to_string();
             *opdst="".to_string();
             *instrLen=2;
+        }
+        else if *iType==instructionType::instrJmpNear
+        {
+            // JMP<condition> i16 displacement
+            *displ=0;
+            *displSize=0;
+
+            let jumpAmt=pmachine.readMemory16(cs,ip+2,pvga);
+            dbgStr.push_str(&format!(" {}",jumpAmt));
+            let delta:i16=jumpAmt as i16;
+            *opsrc=delta.to_string();
+            *opdst="".to_string();
+            *instrLen=4;
         }
         else if *iType==instructionType::instrInt
         {
@@ -3444,6 +3542,16 @@ impl x86cpu
                 realOpdst=format!("0x{:04x}",iw);
             }
 
+            if *opsrc=="eb"
+            {
+                let ib:u16=pmachine.readMemory(cs,ip+1,pvga) as u16;
+                let sign=ib&0x80;
+                let sign_extended=if sign!=0 {0xff} else {0};
+                *u16op=(sign_extended<<8)|(ib&0xff);
+                *instrLen+=1;
+                realOpdst=format!(" [{:04x}]",*u16op);
+            }
+
             if numOperands==1 { dbgStr.push_str(&format!(" {}",realOpdst)); }
             else { dbgStr.push_str(&format!(" {},{}",realOpdst,realOpsrc)); } 
         }
@@ -3484,13 +3592,13 @@ impl x86cpu
     {
         if (*opcode==0xf7) || (*opcode==0xff) || (*opcode==0x80) || (*opcode==0xfe) || (*opcode==0xd2) ||
            (*opcode==0xc1) || (*opcode==0x81) || (*opcode==0x83) || (*opcode==0xd0) || (*opcode==0xf6) || 
-           (*opcode==0xd1) || (*opcode==0xd3) || (*opcode==0xc0)
+           (*opcode==0xd1) || (*opcode==0xd3) || (*opcode==0xc0) || (*opcode==0x82)
         {
             let instrType=pmachine.readMemory(*cs,*ip,pvga);
             let reg:usize=((instrType>>3)&0x07).into();
             *wideOpcode=(reg as u16)|((*opcode as u16)<<8);
         }
-        else if (*opcode==0xdb) || (*opcode==0xdd)
+        else if (*opcode==0xdb) || (*opcode==0xdd) || (*opcode==0x0f)
         {
             let secondByte=pmachine.readMemory(*cs,*ip,pvga);
             *wideOpcode=(secondByte as u16)|((*opcode as u16)<<8);
@@ -3768,7 +3876,11 @@ impl x86cpu
         else if self.decInstr.insType==instructionType::instrJmpShort
         {
             // JE/JNE/etc.
-            self.performJmpShort();
+            self.performJmp();
+        }
+        else if self.decInstr.insType==instructionType::instrJmpNear
+        {
+            self.performJmp();
         }
         else if self.decInstr.insType==instructionType::instrLongJump
         {

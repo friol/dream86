@@ -66,10 +66,8 @@ impl machine
         }
     }
 
-    fn loadBinFile(mem:&mut Vec<u8>,fname:&str)
+    fn loadBinFile(mem:&mut Vec<u8>,fname:&str,comBase:usize)
     {
-        let comBase:usize=0xf0000;
-        
         let mut f = match File::open(fname) {
             Ok(f) => f,
             Err(e) => {
@@ -456,6 +454,12 @@ impl machine
             pcpu.ax=0x5115; // 101 0100 0100 0101
             return true;
         }
+        else if intNum==0x5
+        {
+            // INT 5 printscreen
+            // TODO
+            return true;            
+        }
         else if intNum==0x12
         {
             // INT 12 - Memory Size Determination
@@ -752,7 +756,7 @@ impl machine
             return pvga.readMemory(flatAddr);
         }
 
-        return self.ram[flatAddr as usize];
+        return self.ram[(flatAddr&0xfffff) as usize];
     }
 
     pub fn readMemory16(&self,segment:u16,address:u16,pvga:&vga) -> u16
@@ -766,8 +770,8 @@ impl machine
             return pvga.readMemory16(flatAddr);
         }
 
-        let lobyte:u16=self.ram[flatAddr as usize] as u16;
-        let hibyte:u16=self.ram[(flatAddr+1) as usize] as u16;
+        let lobyte:u16=self.ram[(flatAddr&0xfffff) as usize] as u16;
+        let hibyte:u16=self.ram[((flatAddr+1)&0xfffff) as usize] as u16;
 
         return lobyte|(hibyte<<8);
     }
@@ -785,7 +789,7 @@ impl machine
         }
         else
         {
-            self.ram[flatAddr as usize]=val;
+            self.ram[(flatAddr&0xfffff) as usize]=val;
         }
     }
 
@@ -802,8 +806,8 @@ impl machine
         }
         else
         {
-            self.ram[flatAddr as usize]=(val&0xff) as u8;
-            self.ram[(flatAddr+1) as usize]=(val>>8) as u8;
+            self.ram[(flatAddr&0xfffff) as usize]=(val&0xff) as u8;
+            self.ram[((flatAddr+1)&0xfffff) as usize]=(val>>8) as u8;
         }
     }
 
@@ -830,8 +834,14 @@ impl machine
         }
 
         if mode==0 { Self::loadBIOS(&mut machineRAM,"./bios/bios_cga"); }
-        else if mode==2 { Self::loadBinFile(&mut machineRAM,_comFullPath); }
+        else if mode==2 { Self::loadBinFile(&mut machineRAM,_comFullPath,0xf0000); }
         else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
+
+        // load BASIC roms at f600
+        Self::loadBinFile(&mut machineRAM,"./bios/5000019.bin",0xf6000);
+        Self::loadBinFile(&mut machineRAM,"./bios/5000021.bin",0xf8000);
+        Self::loadBinFile(&mut machineRAM,"./bios/5000022.bin",0xfa000);
+        Self::loadBinFile(&mut machineRAM,"./bios/5000023.bin",0xfc000);
 
         let thestack:Vec<u8>=Vec::new();
         let kq:Vec<u16>=Vec::new();

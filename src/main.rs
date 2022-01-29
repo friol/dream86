@@ -3,9 +3,6 @@
     
     dream86 - 2o22 
 
-    my 1st PC was an 80386sx with MS-DOS 3.30 (an IBM PS/2 model 55sx)
-    my father bought it, so this program (that runs MS-DOS 3.30) is dedicated to him
-
 */
 
 #![allow(non_snake_case)]
@@ -53,15 +50,18 @@ fn main()
     //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dirtest.img".to_string()); // kob goes awry, sholiday
+    //let theDisk=fddController::fddController::new("./diskimages/fs2.img".to_string()); 
     //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
     let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string()); // flr.exe, arkanoid, rax
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // zaxxon, mach3 (finit), telen (finit)
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string()); // frogger, pac-man (in10), pacmania, digdug, digger
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string()); // frogger, pac-man (in10), pacmania, digdug, digger, lr
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string()); // pop, sq1
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2, qbasic
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2, qbasic, winter games
     //let theDisk=fddController::fddController::new("./diskimages/dos3_games8.img".to_string()); // popcorn, monuments of mars, spacerace finit
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games9.img".to_string()); // tts
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_games9.img".to_string()); // tts, aa
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_gamesa.img".to_string()); // 
+    //let theDisk=fddController::fddController::new("./diskimages/dos3_gamesb.img".to_string()); // 
     //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // jumpfar bp+disp
     //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
     //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string());
@@ -194,7 +194,7 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x011f)
+                //if (theCPU.cs==0xdf0) && (theCPU.ip==0x127)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0162)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
                 //if ((theCPU.cs==0x2219) && (theCPU.ip==0x40))
@@ -202,11 +202,11 @@ fn main()
                 //if (theCPU.cs==0xd08) && (theCPU.ip==0x12d)
                 //if (theCPU.cs==0x2f2) && (theCPU.ip==0x3d47)
                 //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0103)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x03d8a)
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x0) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x49f6) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
-                //if (theCPU.cs==0x151e) && (theCPU.ip==0x2db6)
+                //if (theCPU.cs==0x22a6) && (theCPU.ip==0x309)
                 if false
                 {
                     bailOut=true;

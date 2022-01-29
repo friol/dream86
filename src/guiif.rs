@@ -87,6 +87,7 @@ impl guiif
         if videomode==0x13 { vwidth=320; vheight=200; }
         else if videomode==0x01 { vwidth=360; vheight=400; }
         else if videomode==0x02 { vwidth=720; vheight=400; }
+        else if videomode==0x03 { vwidth=720; vheight=400; }
         else if videomode==0x04 { vwidth=320; vheight=200; }
         else if videomode==0x05 { vwidth=320; vheight=200; }
 
@@ -146,32 +147,32 @@ impl guiif
 
         self.videoWindow.get_keys_pressed(KeyRepeat::No).iter().for_each(|key| {
             match key {
-                Key::A => pmachine.addKeystroke(0x61),
-                Key::B => pmachine.addKeystroke(0x62),
-                Key::C => pmachine.addKeystroke(0x63),
-                Key::D => pmachine.addKeystroke(0x64),
-                Key::E => pmachine.addKeystroke(0x65),
-                Key::F => pmachine.addKeystroke(0x66),
-                Key::G => pmachine.addKeystroke(0x67),
-                Key::H => pmachine.addKeystroke(0x68),
-                Key::I => pmachine.addKeystroke(0x69),
-                Key::J => pmachine.addKeystroke(0x6a),
-                Key::K => pmachine.addKeystroke(0x6b),
-                Key::L => pmachine.addKeystroke(0x6c),
-                Key::M => pmachine.addKeystroke(0x6d),
-                Key::N => pmachine.addKeystroke(0x6e),
-                Key::O => pmachine.addKeystroke(0x6f),
-                Key::P => pmachine.addKeystroke(0x70),
-                Key::Q => pmachine.addKeystroke(0x71),
-                Key::R => pmachine.addKeystroke(0x72),
-                Key::S => pmachine.addKeystroke(0x73),
-                Key::T => pmachine.addKeystroke(0x74),
-                Key::U => pmachine.addKeystroke(0x75),
-                Key::V => pmachine.addKeystroke(0x76),
-                Key::W => pmachine.addKeystroke(0x77),
-                Key::X => pmachine.addKeystroke(0x78),
-                Key::Y => pmachine.addKeystroke(0x79),
-                Key::Z => pmachine.addKeystroke(0x7a),
+                Key::A => pmachine.addKeystroke(0x1e61),
+                Key::B => pmachine.addKeystroke(0x3062),
+                Key::C => pmachine.addKeystroke(0x2e63),
+                Key::D => pmachine.addKeystroke(0x2064),
+                Key::E => pmachine.addKeystroke(0x1265),
+                Key::F => pmachine.addKeystroke(0x2166),
+                Key::G => pmachine.addKeystroke(0x2267),
+                Key::H => pmachine.addKeystroke(0x2368),
+                Key::I => pmachine.addKeystroke(0x1769),
+                Key::J => pmachine.addKeystroke(0x246a),
+                Key::K => pmachine.addKeystroke(0x256b),
+                Key::L => pmachine.addKeystroke(0x266c),
+                Key::M => pmachine.addKeystroke(0x326d),
+                Key::N => pmachine.addKeystroke(0x316e),
+                Key::O => pmachine.addKeystroke(0x186f),
+                Key::P => pmachine.addKeystroke(0x1970),
+                Key::Q => pmachine.addKeystroke(0x1071),
+                Key::R => pmachine.addKeystroke(0x1372),
+                Key::S => pmachine.addKeystroke(0x1f73),
+                Key::T => pmachine.addKeystroke(0x1474),
+                Key::U => pmachine.addKeystroke(0x1675),
+                Key::V => pmachine.addKeystroke(0x2f76),
+                Key::W => pmachine.addKeystroke(0x1177),
+                Key::X => pmachine.addKeystroke(0x2d78),
+                Key::Y => pmachine.addKeystroke(0x1579),
+                Key::Z => pmachine.addKeystroke(0x2c7a),
                 Key::Key0 => pmachine.addKeystroke(0x0b30),
                 Key::Key1 => pmachine.addKeystroke(0x0231),
                 Key::Key2 => pmachine.addKeystroke(0x0332),
@@ -298,9 +299,9 @@ impl guiif
 
         let mut stdout = stdout();
 
-        let ln=theMachine.stackey.len();
+        //let ln=theMachine.stackey.len();
 
-        let mut ii=0;
+        /*let mut ii=0;
         for el in &theMachine.stackey
         {
             if (ln>20) && (ii>(ln-5))
@@ -310,7 +311,7 @@ impl guiif
                 stdout.queue(style::PrintStyledContent(ss.to_string().white())).ok();
             }
             ii+=1;
-        }
+        }*/
 
         // instrs
 

@@ -1,5 +1,7 @@
 /* the VGA - dream86 */
 
+use std::process;
+
 use crate::guiif::guiif;
 
 pub struct vga
@@ -35,10 +37,10 @@ impl vga
             // 40x25 textmode 9x16
             self.mode=0x1;
         }
-        else if videomodeNum==0x02
+        else if (videomodeNum==0x02) || (videomodeNum==0x03)
         {
             // 80x25 textmode 9x16
-            self.mode=0x2;
+            self.mode=videomodeNum;
         }
         else if (videomodeNum==0x04) || (videomodeNum==0x05)
         {
@@ -57,6 +59,11 @@ impl vga
                     else { self.cgaFramebuffer[idx]=0x20; }
                 }
             }
+        }
+        else
+        {
+            println!("Bailing out: vga::cannot switch to mode {:02x}",videomodeNum);
+            process::exit(0x0100);
         }
     }
 
@@ -168,7 +175,7 @@ impl vga
     pub fn writeCharsWithAttribute(&mut self,ochar:u16,attrib:u16,nchars:u16)
     {
         // if in textmode
-        if self.mode==2
+        if (self.mode==2) || (self.mode==3)
         {
             let numColumns=80;
             for _i in 0..nchars
@@ -182,7 +189,7 @@ impl vga
     pub fn outputCharToStdout(&mut self,ochar:u8)
     {
         // if in textmode
-        if self.mode==2
+        if (self.mode==2) || (self.mode==3)
         {
             let charCol=7;
             let numColumns=80;
@@ -302,7 +309,7 @@ impl vga
                 idx+=1;
             }        
         }
-        else if (self.mode==0x01) || (self.mode==0x02)
+        else if (self.mode==0x01) || (self.mode==0x02)  || (self.mode==0x03)
         {
             // mode 1 - 40x25 text mode, 9x16 chars, 360x400
             // mode 2 - 80x25 text mode, 9x16 chars, 720x400
