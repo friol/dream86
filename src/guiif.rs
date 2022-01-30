@@ -85,13 +85,15 @@ impl guiif
         let mut buffer:Vec<u32>;
 
         if videomode==0x13 { vwidth=320; vheight=200; }
+        else if videomode==0x00 { vwidth=360; vheight=400; }
         else if videomode==0x01 { vwidth=360; vheight=400; }
         else if videomode==0x02 { vwidth=720; vheight=400; }
         else if videomode==0x03 { vwidth=720; vheight=400; }
         else if videomode==0x04 { vwidth=320; vheight=200; }
         else if videomode==0x05 { vwidth=320; vheight=200; }
+        else if videomode==0x0d { vwidth=320; vheight=200; }
 
-        if videomode==0x13 || videomode==0x04  || videomode==0x05
+        if videomode==0x13 || videomode==0x04  || videomode==0x05 || videomode==0x0d
         {
             window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
                 scale: Scale::X2,

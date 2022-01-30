@@ -157,7 +157,7 @@ impl machine
 
     }
 
-    // returns if we should go on with the code
+    // returns true if we should go on with the code
     pub fn handleINT(&mut self,intNum:u8,pcpu:&mut x86cpu,pvga:&mut vga,pdisk:&fddController) -> bool
     {
         if intNum==0x10
@@ -166,7 +166,9 @@ impl machine
             if (pcpu.ax&0xff00)==0
             {
                 // set videomode
-                pvga.setVideomode(pcpu.ax&0xff);
+                // = 8x  EGA, MCGA or VGA ignore bit 7
+                println!("vga::setting videomode {:02x} at {:04x}:{:04x}",pcpu.ax&0xff,pcpu.cs,pcpu.ip);
+                pvga.setVideomode(pcpu.ax&0x7f);
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1000

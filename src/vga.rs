@@ -32,10 +32,10 @@ impl vga
                 self.framebuffer[idx]=0;
             }
         }
-        else if videomodeNum==0x01
+        else if (videomodeNum==0x00) || (videomodeNum==0x01)
         {
             // 40x25 textmode 9x16
-            self.mode=0x1;
+            self.mode=videomodeNum;
         }
         else if (videomodeNum==0x02) || (videomodeNum==0x03)
         {
@@ -60,6 +60,15 @@ impl vga
                 }
             }
         }
+        else if videomodeNum==0x0d
+        {
+            // EGA 320x200x16
+            self.mode=0x0d;
+            for idx in 0..self.framebuffer.len()
+            {
+                self.framebuffer[idx]=0;
+            }
+        }
         else
         {
             println!("Bailing out: vga::cannot switch to mode {:02x}",videomodeNum);
@@ -69,7 +78,7 @@ impl vga
 
     pub fn getNumberOfColumns(&self) -> u16
     {
-        if self.mode==0x01
+        if (self.mode==0x00) || (self.mode==0x01)
         {
             return 40;
         }
@@ -309,13 +318,13 @@ impl vga
                 idx+=1;
             }        
         }
-        else if (self.mode==0x01) || (self.mode==0x02)  || (self.mode==0x03)
+        else if (self.mode==0x00) || (self.mode==0x01) || (self.mode==0x02)  || (self.mode==0x03)
         {
-            // mode 1 - 40x25 text mode, 9x16 chars, 360x400
+            // mode 0,1 - 40x25 text mode, 9x16 chars, 360x400
             // mode 2 - 80x25 text mode, 9x16 chars, 720x400
 
             let mut resx=720; let mut resy=400; let mut rows=80; let mut cols=25;
-            if self.mode==0x01 
+            if (self.mode==0x00) || (self.mode==0x01)
             { 
                 resx=360; resy=400; rows=40; cols=25; 
             }
@@ -353,8 +362,36 @@ impl vga
                 idx+=1;
             }        
         }
+        else if self.mode==0x0d
+        {
+            // EGA 320x200x16
+            let mut idx:usize=0;
+            let mut curbit=7;
+            
+            for i in gui.frameBuffer.iter_mut() 
+            {
+                {
+                    let p0=(self.framebuffer[idx]&(1<<curbit))>>curbit;
+                    let p1=(self.framebuffer[idx+0x2000]&(1<<curbit))>>curbit;
+                    let p2=(self.framebuffer[idx+0x4000]&(1<<curbit))>>curbit;
+                    let p3=(self.framebuffer[idx+0x6000]&(1<<curbit))>>curbit;
+
+                    let colidx=p0|(p1<<1)|(p2<<2)|(p3<<3);
+
+                    *i = self.vgaPalette[colidx as usize];
+
+                    curbit-=1;
+                    if curbit<0
+                    {
+                        curbit=7;
+                        idx+=1;
+                    }
+                }
+            }               
+        }
         else if self.mode==0x04 || self.mode==0x05
         {
+            // CGA 320x200 4 colors
             let mut adder=0;
             let mut currow=0;
             let mut curbyte=0;

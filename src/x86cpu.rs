@@ -940,25 +940,33 @@ impl x86cpu
             let dx32:i32=self.dx as i32;
             let ax32:i32=self.ax as i32;
             let dv32:i32=self.getOperandValue(&operand1,pmachine,pvga) as i16 as i32;
-            let val2divide:i32=ax32|(dx32<<16);
-            let modulo=val2divide%dv32;
-            let quotient=val2divide/dv32;
-            self.dx=modulo as u16;
-            self.ax=quotient as u16;
 
-            self.doZflag(quotient as u16);
-            //self.doPflag(quotient as u16); // todo check p flag
+            if dv32!=0
+            {
+                let val2divide:i32=ax32|(dx32<<16);
+                let modulo=val2divide%dv32;
+                let quotient=val2divide/dv32;
+                self.dx=modulo as u16;
+                self.ax=quotient as u16;
+
+                self.doZflag(quotient as u16);
+                //self.doPflag(quotient as u16); // todo check p flag
+            }
         }
         else
         {
             let dv32:i32=self.getOperandValue(&operand1,pmachine,pvga) as i8 as i32;
             let val2divide:i32=self.ax as i16 as i32;
-            let modulo=val2divide%dv32;
-            let quotient=val2divide/dv32;
-            self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
 
-            self.doZflag(quotient as u16);
-            //self.doPflag(quotient as u16); // todo check p flag
+            if dv32!=0
+            {
+                let modulo=val2divide%dv32;
+                let quotient=val2divide/dv32;
+                self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
+    
+                self.doZflag(quotient as u16);
+                //self.doPflag(quotient as u16); // todo check p flag
+            }
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -2431,8 +2439,10 @@ impl x86cpu
 
         let result:i32=ax32+valtoadd;
 
-        if self.decInstr.instrSize==8 { if ((result&0xff)<ax32)||((result&0xff)<valtoadd) { self.setCflag(true); } else { self.setCflag(false); } }
-        else if self.decInstr.instrSize==16 { if ((result&0xffff)<ax32)||((result&0xffff)<valtoadd) { self.setCflag(true); } else { self.setCflag(false); } }
+        //if self.decInstr.instrSize==8 { if ((result&0xff)<ax32)||((result&0xff)<valtoadd) { self.setCflag(true); } else { self.setCflag(false); } }
+        //else if self.decInstr.instrSize==16 { if ((result&0xffff)<ax32)||((result&0xffff)<valtoadd) { self.setCflag(true); } else { self.setCflag(false); } }
+        if self.decInstr.instrSize==8 { if result>0xff { self.setCflag(true); } else { self.setCflag(false); } }
+        else if self.decInstr.instrSize==16 { if result>0xffff { self.setCflag(true); } else { self.setCflag(false); } }
 
         self.doOAflagsAdd(ax32 as u16,valtoadd as u16,(ax32+valtoadd) as u16);
         
@@ -2455,12 +2465,16 @@ impl x86cpu
         let mut res:i32=op+op2+carry;
         self.moveToDestination(&(res as u16),&dstReg,pmachine,pvga);
 
+        //if self.decInstr.instrSize==8 { if ((res&0xff)<=op)||((res&0xff)<=op2) { self.setCflag(true); } else { self.setCflag(false); } }
+        //else if self.decInstr.instrSize==16 { if ((res&0xffff)<=op)||((res&0xffff)<=op2) { self.setCflag(true); } else { self.setCflag(false); } }
+        if self.decInstr.instrSize==8 { if res>0xff { self.setCflag(true); } else { self.setCflag(false); } }
+        else if self.decInstr.instrSize==16 { if res>0xffff { self.setCflag(true); } else { self.setCflag(false); } }
+
         if self.decInstr.instrSize==8 { res&=0xff; }
         else { res&=0xffff; }
 
         self.doOAflagsAdd(op as u16,op2 as u16,res as u16);
 
-        // TODO oca flags
         self.doZflag(res as u16);
         self.doSflag(res as u16,self.decInstr.instrSize);
         self.doPflag(res as u16);
@@ -3168,6 +3182,7 @@ impl x86cpu
             0xc004 => { return ["SHL","8","2","rmb","ib","Shl","1"]; }            // 186
             0xc005 => { return ["SHR","8","2","rmb","ib","Shl","1"]; }            // 186
             
+            0xc100 => { return ["ROL","16","2","rmw","ib","Rol","1"]; }            // 186
             0xc104 => { return ["SHL","16","2","rmw","ib","Shl","1"]; }            // 186
             0xc105 => { return ["SHR","16","2","rmw","ib","Shr","1"]; }            // 186
 
@@ -3177,6 +3192,7 @@ impl x86cpu
             0xd003 => { return ["RCR","8","2","rmb","1","Rcr","1"]; }
             0xd004 => { return ["SHL","8","2","rmb","1","Shl","1"]; }
             0xd005 => { return ["SHR","8","2","rmb","1","Shr","1"]; }
+            0xd007 => { return ["SAR","8","2","rmb","1","Sar","1"]; }
 
             0xd100 => { return ["ROL","16","2","rmw","1","Rol","1"]; }            
             0xd101 => { return ["ROR","16","2","rmw","1","Ror","1"]; }            

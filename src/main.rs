@@ -2,16 +2,19 @@
 /* 
     
     dream86 - 2o22 
+    x86/PC emulator in Rust
 
 */
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-//use std::process;
+use std::process;
 //use std::{thread, time};
 //use std::fs::File;
 //use std::io::prelude::*;
+
+use std::env;
 use std::time::Instant;
 
 mod vga;
@@ -23,49 +26,23 @@ mod guiif;
 fn main()
 {
     let mut _breakIt=false;
+    
+    let args: Vec<String> = env::args().collect();
+    if args.len()!=4
+    {
+        println!("syntax: cargo run --release <disk image full path> <com name> <runmode>");        
+        process::exit(0x0);
+    }
+
+    let diskImageName=String::from(&args[1]);
+    let comName=String::from(&args[2]);
+    let runMode=String::from(&args[3]).parse::<u8>().unwrap();
+
+    //
+
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
-
-    //let mut theMachine=machine::machine::new("./programs/dino.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/pillman.com",0x100000,0);
-    //let mut theMachine=machine::machine::new("./programs/invaders.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/fbird.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/bricks.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/rogue.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/sorryass.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/basic.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/tests/add.bin",0x100000,2);
-    //let mut theMachine=machine::machine::new("./programs/tests/bitwise.bin",0x100000,2);
-    //let mut theMachine=machine::machine::new("./programs/tests/cmpneg.bin",0x100000,2);
-    //let mut theMachine=machine::machine::new("./programs/tests/shifts.bin",0x100000,2);
-    //let mut theMachine=machine::machine::new("./programs/tests/sub.bin",0x100000,0);
-    let mut theMachine=machine::machine::new("./programs/tests/datatrnf.bin",0x100000,0);
-    //let mut theMachine=machine::machine::new("./programs/dirojedc.com",0x100000,1);
-    //let mut theMachine=machine::machine::new("./programs/CGADOTS.COM",0x100000);
-    //let mut theMachine=machine::machine::new("../../testcga.com",0x100000);
-    //let mut theMachine=machine::machine::new("./programs/SIN.com",0x100000,1);
-
-    //let theDisk=fddController::fddController::new("./diskimages/pillman.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/invaders.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/tetros.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/basic.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/toledo_atomchess_bootos.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dirtest.img".to_string()); // kob goes awry, sholiday
-    //let theDisk=fddController::fddController::new("./diskimages/fs2.img".to_string()); 
-    //let theDisk=fddController::fddController::new("./diskimages/Dos3.3.img".to_string()); // ohohoh
-    let theDisk=fddController::fddController::new("./diskimages/dos3_games2.img".to_string()); // flr.exe, arkanoid, rax
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games3.img".to_string()); // zaxxon, mach3 (finit), telen (finit)
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games4.img".to_string()); // fs3
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games5.img".to_string()); // frogger, pac-man (in10), pacmania, digdug, digger, lr
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games6.img".to_string()); // pop, sq1
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games7.img".to_string()); // pitstop2, qbasic, winter games
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games8.img".to_string()); // popcorn, monuments of mars, spacerace finit
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_games9.img".to_string()); // tts, aa
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_gamesa.img".to_string()); // 
-    //let theDisk=fddController::fddController::new("./diskimages/dos3_gamesb.img".to_string()); // 
-    //let theDisk=fddController::fddController::new("./diskimages/freedos.img".to_string()); // jumpfar bp+disp
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/dos5.0.img".to_string());
-    //let theDisk=fddController::fddController::new("./diskimages/Dos6.22.img".to_string());
+    let mut theMachine=machine::machine::new(&comName,0x100000,runMode);
+    let theDisk=fddController::fddController::new(diskImageName);
     let mut theCPU=x86cpu::x86cpu::new();
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -194,8 +171,10 @@ fn main()
                 // 0x0070:0x3928 - int 15h
                 // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
 
-                //if (theCPU.cs==0xdf0) && (theCPU.ip==0x127)
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x0162)
+                //if (theCPU.cs==0x5250) && (theCPU.ip==0x4250)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x108)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x4110)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x413a)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
                 //if ((theCPU.cs==0x2219) && (theCPU.ip==0x40))
                 //if ((theCPU.cs==0xe0b) && (theCPU.ip==0x1da9))
@@ -206,7 +185,7 @@ fn main()
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x0) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x49f6) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
-                //if (theCPU.cs==0x22a6) && (theCPU.ip==0x309)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100)
                 if false
                 {
                     bailOut=true;
