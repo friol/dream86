@@ -2433,7 +2433,6 @@ impl x86cpu
 
     fn doAdd(&mut self,srcVal:&u16,dstReg:&String,pmachine:&mut machine,pvga:&mut vga)
     {
-        // TODO oa flags
         let valtoadd:i32=*srcVal as i32;
         let mut ax32:i32=self.getOperandValue(&dstReg,pmachine,pvga) as i32;
 

@@ -840,10 +840,10 @@ impl machine
         else { Self::loadCOMFile(&mut machineRAM,_comFullPath); }
 
         // load BASIC roms at f600
-        Self::loadBinFile(&mut machineRAM,"./bios/5000019.bin",0xf6000);
+        /*Self::loadBinFile(&mut machineRAM,"./bios/5000019.bin",0xf6000);
         Self::loadBinFile(&mut machineRAM,"./bios/5000021.bin",0xf8000);
         Self::loadBinFile(&mut machineRAM,"./bios/5000022.bin",0xfa000);
-        Self::loadBinFile(&mut machineRAM,"./bios/5000023.bin",0xfc000);
+        Self::loadBinFile(&mut machineRAM,"./bios/5000023.bin",0xfc000);*/
 
         let thestack:Vec<u8>=Vec::new();
         let kq:Vec<u16>=Vec::new();

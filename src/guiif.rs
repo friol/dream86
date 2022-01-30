@@ -133,9 +133,9 @@ impl guiif
         self.videoWindow.update_with_buffer(&self.frameBuffer,self.videoWinWidth as usize,self.videoWinHeight as usize).unwrap();
     }
 
-    pub fn checkEscPressed(&mut self) -> bool
+    pub fn checkExit(&mut self) -> bool
     {
-        return self.videoWindow.is_key_down(Key::Escape);
+        return self.videoWindow.is_key_down(Key::Tab);
     }
 
     pub fn processKeys(&mut self,pmachine:&mut machine,theCPU:&mut x86cpu,_pvga:&mut vga) -> bool
@@ -202,6 +202,7 @@ impl guiif
                 Key::Left => pmachine.addKeystroke(0x4b00),
                 Key::Right => pmachine.addKeystroke(0x4d00),
                 Key::NumPadSlash => pmachine.addKeystroke(0x352f),
+                Key::Escape => pmachine.addKeystroke(0x011B),
                 _ => return ,
             }
 

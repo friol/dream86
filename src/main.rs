@@ -219,7 +219,7 @@ fn main()
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 
-                    if theGUI.checkEscPressed()
+                    if theGUI.checkExit()
                     {
                         bailOut=true;
                     }
