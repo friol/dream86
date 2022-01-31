@@ -9,4 +9,14 @@ dream86 is capable of running MS-DOS 3.30; it was the 1st OS that it booted. It 
 <br/>
 dream86 is written in Rust. It's an experiment. I started using this language in December 2021, when I was searching for a different language to do Advent Of Code (https://adventofcode.com/). I'm not proficient in this language, but at least now I know that you have to run "cargo run --release" if you want an executable that is not a snail.
 
+To compile and run dream86:
 
+```
+cargo run --release <disk image full path> <com name> <runmode>
+```
+
+where: 
+
+"disk image full path" is the path of a 1.44 .img disk image
+"com name" is the name of a .com program (used only with runmode=1 or 2)
+"runmode" is 0 to run the disk image, 1 to run the com file at the 2nd parameter and 2 to run a .bin file from artlav's test suite
