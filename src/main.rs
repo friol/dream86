@@ -43,7 +43,7 @@ fn main()
     let mut theVGA=vga::vga::new("./fonts/9x16.png");
     let mut theMachine=machine::machine::new(&comName,0x100000,runMode);
     let theDisk=fddController::fddController::new(diskImageName);
-    let mut theCPU=x86cpu::x86cpu::new();
+    let mut theCPU=x86cpu::x86cpu::new(runMode);
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
     let mut goOut=false;
@@ -164,28 +164,15 @@ fn main()
                 theMachine.update(&mut theCPU);
                 inum+=1;
 
-                //if theCPU.ip==0x7d74 // dos 3.3 reads disk 2nd time here
-                // 0x0070:0x356a - writes nec io.sys banner
-                // 0x0070:0x36d5 - dos 3.3 tries to check hard drive (dl=0x80)
-                // 0x0070:0x3708 - dos 3.3 drive a: check (dl=00)
-                // 0x0070:0x3928 - int 15h
-                // 0x0070:0x3f65 - cmp si, 0xffff (sign extended)
-
-                //if (theCPU.cs==0x5250) && (theCPU.ip==0x4250)
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x108)
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100) // start of itest.com
+                //if (theCPU.cs==0x5250) && (theCPU.ip==0x4de3) // arkanoid before taito logo
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x4110)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x413a)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
-                //if ((theCPU.cs==0x2219) && (theCPU.ip==0x40))
-                //if ((theCPU.cs==0xe0b) && (theCPU.ip==0x1da9))
-                //if (theCPU.cs==0xd08) && (theCPU.ip==0x12d)
-                //if (theCPU.cs==0x2f2) && (theCPU.ip==0x3d47)
-                //if (theCPU.cs==0x9dfd) && (theCPU.ip==0xeea)
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x03d8a)
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x0) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x49f6) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100)
+                //if (theCPU.cs==0x0e0b) && (theCPU.ip==0x00cf)
                 if false
                 {
                     bailOut=true;

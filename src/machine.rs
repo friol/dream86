@@ -303,6 +303,12 @@ impl machine
                 // TODO
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0xfe00
+            {
+                // INT 10,FE - Get DESQView/TopView Virtual Screen Regen Buffer
+                // TODO
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt");

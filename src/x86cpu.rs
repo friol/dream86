@@ -8,7 +8,6 @@
     - wrap around registers everywhere
     - unify lds, les, etc.
     - auxiliary flag in cmps and scas
-    - overflow flag
     - test IDIV!!!
     
 */
@@ -168,7 +167,7 @@ pub struct x86cpu
 
 impl x86cpu
 {
-    pub fn new() -> Self 
+    pub fn new(runMode:u8) -> Self 
     {
         let decIn=decodedInstruction {
             insType: instructionType::instrNone,
@@ -185,26 +184,54 @@ impl x86cpu
             debugDecode: String::from("Undecodable"),
         };
 
-        x86cpu
+        if runMode==0
         {
-            ax: 0,
-            bx: 0,
-            cx: 0,
-            dx: 0,
-            si: 0,
-            di: 0,
-            bp: 0,
-            sp: 0xFFFE,
-            ip: 0x100, 
-            cs: 0xf000,
-            ds: 0xf000,
-            es: 0xf000,
-            ss: 0xf000,
-            flags: 0,
-            totInstructions: 0,
-            decInstr: decIn,
-            isIntPending: false,
-            intPendingNum: 0,
+            x86cpu
+            {
+                ax: 0,
+                bx: 0,
+                cx: 0,
+                dx: 0,
+                si: 0,
+                di: 0,
+                bp: 0,
+                sp: 0xFFFE,
+                ip: 0x100, 
+                cs: 0xf000,
+                ds: 0xf000,
+                es: 0xf000,
+                ss: 0xf000,
+                flags: 0,
+                totInstructions: 0,
+                decInstr: decIn,
+                isIntPending: false,
+                intPendingNum: 0,
+            }
+        }
+        else
+        {
+            x86cpu
+            {
+                ax: 0,
+                bx: 0,
+                cx: 0,
+                dx: 0,
+                si: 0,
+                di: 0,
+                bp: 0,
+                sp: 0xFFFE,
+                ip: 0xfff0, 
+                cs: 0xf000,
+                ds: 0x0,
+                es: 0x0,
+                ss: 0x0,
+                flags: 0,
+                totInstructions: 0,
+                decInstr: decIn,
+                isIntPending: false,
+                intPendingNum: 0,
+            }
+
         }
     }
 
@@ -360,6 +387,11 @@ impl x86cpu
                 let theAddr:i32=(self.bp as i32)+(self.decInstr.displacement as i32);
                 dst=theAddr as u16;
             }
+            else if operand1.contains("[BX+DI+Disp]")
+            {
+                let theAddr:i32=(self.bx as i32)+(self.di as i32)+(self.decInstr.displacement as i32);
+                dst=theAddr as u16;
+            }
             else if operand1.contains("[BP+DI+Disp]")
             {
                 let theAddr:i32=(self.bp as i32)+(self.di as i32)+(self.decInstr.displacement as i32);
@@ -467,7 +499,7 @@ impl x86cpu
             for _idx in 0..shiftAmount
             {
                 let cval=if self.getCflag() { 1 } else { 0 };
-                let lastBit=val2shift&0x8000;
+                let lastBit=(val2shift&0x8000)>>15;
                 if lastBit==1 { self.setCflag(true); }                
                 else { self.setCflag(false); }
                 val2shift<<=1;
@@ -487,7 +519,7 @@ impl x86cpu
             for _idx in 0..shiftAmount
             {
                 let cval=if self.getCflag() { 1 } else { 0 };
-                let lastBit=val2shift&0x80;
+                let lastBit=(val2shift&0x80)>>7;
                 if lastBit==1 { self.setCflag(true); }                
                 else { self.setCflag(false); }
                 val2shift<<=1;
@@ -570,7 +602,7 @@ impl x86cpu
 
             for _idx in 0..shiftAmount
             {
-                let lastBit=val2shift&0x8000;
+                let lastBit=(val2shift&0x8000)>>15;
                 if lastBit==1 { self.setCflag(true); }                
                 else { self.setCflag(false); }
                 val2shift<<=1;
@@ -590,7 +622,7 @@ impl x86cpu
 
             for _idx in 0..shiftAmount
             {
-                let lastBit=val2shift&0x80;
+                let lastBit=(val2shift&0x80)>>7;
                 if lastBit==1 { self.setCflag(true); }                
                 else { self.setCflag(false); }
                 val2shift<<=1;
@@ -1687,6 +1719,7 @@ impl x86cpu
             } 
         }
         else if &self.decInstr.debugDecode[0..2]=="JB" { if self.getCflag() { performJump=true; } }
+        else if &self.decInstr.debugDecode[0..3]=="JNO" { if !self.getOflag() { performJump=true; } }
         else if &self.decInstr.debugDecode[0..2]=="JO" { if self.getOflag() { performJump=true; } }
         else if &self.decInstr.debugDecode[0..3]=="JAE" { if !self.getCflag() { performJump=true; } }
         else if &self.decInstr.debugDecode[0..2]=="JE" { if self.getZflag() { performJump=true; } }
@@ -1727,7 +1760,7 @@ impl x86cpu
             self.cx=self.cx.wrapping_sub(1); 
             if (self.cx!=0) && (self.getZflag()==false) { performJump=true; } 
         }
-        else if &self.decInstr.debugDecode[0..6]=="LOOPE" 
+        else if &self.decInstr.debugDecode[0..5]=="LOOPE" 
         { 
             self.cx=self.cx.wrapping_sub(1); 
             if (self.cx!=0) && (self.getZflag()==true) { performJump=true; } 
@@ -1774,6 +1807,12 @@ impl x86cpu
         else if op1.contains("[BX+Disp]")
         {
             let offset16=self.bx+self.decInstr.displacement as u16;
+            adr=pmachine.readMemory16(readSeg,offset16,pvga);
+            seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
+        }
+        else if op1.contains("[BX+SI+Disp]")
+        {
+            let offset16=self.bx+self.si+self.decInstr.displacement as u16;
             adr=pmachine.readMemory16(readSeg,offset16,pvga);
             seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
         }
@@ -2213,16 +2252,18 @@ impl x86cpu
         }
         else if dstReg.contains("[BX+DI+Disp]")
         {
-            if self.decInstr.segOverride!=""
-            {
-                self.abort("unhandled seg override");
-            }
+            let mut writeSeg:u16=self.ds;
+            if self.decInstr.segOverride=="CS" { writeSeg=self.cs; }
+            else if self.decInstr.segOverride=="SS" { writeSeg=self.ss; }
+            else if self.decInstr.segOverride=="DS" { writeSeg=self.ds; }
+            else if self.decInstr.segOverride=="ES" { writeSeg=self.es; }
+
             let mut di32:i32=self.di as i32;
             di32+=self.decInstr.displacement;
             di32+=self.bx as i32;
 
-            if self.decInstr.instrSize==8 { pmachine.writeMemory(self.ds,di32 as u16,*srcVal as u8,pvga); }
-            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(self.ds,di32 as u16,*srcVal as u16,pvga); }
+            if self.decInstr.instrSize==8 { pmachine.writeMemory(writeSeg,di32 as u16,*srcVal as u8,pvga); }
+            else if self.decInstr.instrSize==16 { pmachine.writeMemory16(writeSeg,di32 as u16,*srcVal as u16,pvga); }
         }
         else if dstReg.contains("[BX+DI]")
         {
@@ -2983,6 +3024,7 @@ impl x86cpu
             0xaf => { return ["SCASW","16","0","","","Scas","0"]; }
             // Jump short
             0x70 => { return ["JO","8","1","r0","","JmpShort","0"]; }
+            0x71 => { return ["JNO","8","1","r0","","JmpShort","0"]; }
             0x72 => { return ["JB","8","1","r0","","JmpShort","0"]; }
             0x73 => { return ["JAE","8","1","r0","","JmpShort","0"]; }
             0x74 => { return ["JE","8","1","r0","","JmpShort","0"]; }
@@ -3137,15 +3179,11 @@ impl x86cpu
             0x9f => { return ["LAHF","8","0","","","Lahf","0"]; }
             // SAHF
             0x9e => { return ["SAHF","8","0","","","Sahf","0"]; }
-            // AAM
-            0xd4 => { return ["AAM","8","0","","","Aam","0"]; }
-            // AAD
+
+            0xd4 => { return ["AAM","8","1","ib","","Aam","0"]; }
             0xd5 => { return ["AAD","16","0","","","Aad","0"]; }
-            // DAA
             0x27 => { return ["DAA","8","0","","","Daa","0"]; }
-            // DAS
             0x2f => { return ["DAS","8","0","","","Das","0"]; }
-            // AAA
             0x37 => { return ["AAA","8","0","","","Aaa","0"]; }
 
             // Multi-byte instructions
@@ -3178,6 +3216,7 @@ impl x86cpu
             0x8306 => { return ["XOR","16","2","eb","rmw","Xor","0"]; }
             0x8307 => { return ["CMP","16","2","eb","rmw","Cmp","0"]; }
 
+            0xc001 => { return ["ROR","8","2","rmb","ib","Ror","1"]; }            // 186
             0xc004 => { return ["SHL","8","2","rmb","ib","Shl","1"]; }            // 186
             0xc005 => { return ["SHR","8","2","rmb","ib","Shl","1"]; }            // 186
             
@@ -3209,6 +3248,7 @@ impl x86cpu
 
             0xd300 => { return ["ROL","16","2","rmw","CL","Rol","1"]; }            
             0xd301 => { return ["ROR","16","2","rmw","CL","Ror","1"]; }            
+            0xd302 => { return ["RCL","16","2","rmw","CL","Rcl","1"]; }            
             0xd304 => { return ["SHL","16","2","rmw","CL","Shl","1"]; }            
             0xd305 => { return ["SHR","16","2","rmw","CL","Shr","1"]; }            
             0xd307 => { return ["SAR","16","2","rmw","CL","Sar","1"]; }            
@@ -3240,6 +3280,7 @@ impl x86cpu
             0xff05 => { return ["JMP FAR WORD","16","1","rmw","","Jumpfw","1"]; }
             0xff06 => { return ["PUSH","16","1","rmw","","Push","1"]; }
 
+            // some games check for the existence of the FPU with those 2 instructions
             0xdbe3 => { return ["FNINIT","8","0","","","Fninit","1"]; }
             0xdd3e => { return ["FNSTSW","8","0","","","Fnstsw","1"]; }
 
@@ -3510,6 +3551,7 @@ impl x86cpu
                 (*iType==instructionType::instrLongJump) ||
                 (*iType==instructionType::instrRetfiw) ||
                 (*iType==instructionType::instrRetiw) ||
+                (*iType==instructionType::instrAam) ||
                 (*iType==instructionType::instrSubNoModRegRm)
         {
             *displ=0;
@@ -3567,7 +3609,7 @@ impl x86cpu
                 realOpdst=format!(" [{:04x}]",*u16op);
             }
 
-            if numOperands==1 { dbgStr.push_str(&format!(" {}",realOpdst)); }
+            if numOperands==1 { dbgStr.push_str(&format!(" {}",realOpsrc)); }
             else { dbgStr.push_str(&format!(" {},{}",realOpdst,realOpsrc)); } 
         }
         else if (*iType==instructionType::instrIn) || (*iType==instructionType::instrOutNoModRegRm)
@@ -3988,6 +4030,16 @@ impl x86cpu
             {
                 offs=self.di+self.decInstr.displacement as u16;
             }
+            else if self.decInstr.operand1.contains("[BP+SI+Disp]")
+            {
+                readSeg=self.ss;
+                if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
+                else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
+                else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
+                else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
+    
+                offs=self.bp+self.si+self.decInstr.displacement as u16;
+            }
             else if self.decInstr.operand1=="Direct Addr"
             {
                 offs=pmachine.readMemory16(readSeg,self.ip+2+soadder,pvga);
@@ -4201,10 +4253,12 @@ impl x86cpu
         }
         else if self.decInstr.insType==instructionType::instrAam
         {
-            // wtf does this do
+            let operand:u16=self.decInstr.u8immediate as u16;
+            //self.abort(&format!("AAM, operand is {:02x}",operand));
+
             let mut al=self.ax&0xff;
-            let remainder=al%0x0a;
-            al/=0x0a;
+            let remainder=al%operand;
+            al/=operand;
             self.ax=remainder|(al<<8);
 
             self.doZflag(self.ax&0xff);
@@ -4215,17 +4269,15 @@ impl x86cpu
         }
         else if self.decInstr.insType==instructionType::instrDas
         {
-            let origValue:u8=(self.ax&0xff) as u8;
+            let origAL:u8=(self.ax&0xff) as u8;
+            let mut al=origAL;
             let origC = self.getCflag();
-
-            self.setCflag(false);
+            let mut cf=false;
 
             if ((self.ax&0x0F)>9) || (self.getAflag()) 
             {
-                let mut al=self.ax&0xff;
                 al=al.wrapping_sub(6);
-                self.ax=(self.ax&0xff00)|al;
-                self.setCflag(origC | ((self.ax & 0x80) == 0));
+                if origC || (al>origAL) { cf=true; } else { cf=false; }
                 self.setAflag(true);
             } 
             else 
@@ -4233,13 +4285,15 @@ impl x86cpu
                 self.setAflag(false);
             }
             
-            if (origValue > 0x99) || (origC) 
+            if (origAL > 0x99) || (origC) 
             {
-                let mut al=self.ax&0xff;
                 al=al.wrapping_sub(0x60);
-                self.ax=(self.ax&0xff00)|al;
-                self.setCflag(true);
+                cf=true;
             }
+
+            self.setCflag(cf);
+
+            self.ax=(self.ax&0xff00)|(al as u16);
 
             self.doZflag(self.ax&0xff);
             self.doPflag(self.ax&0xff);
@@ -4249,34 +4303,35 @@ impl x86cpu
         }
         else if self.decInstr.insType==instructionType::instrDaa
         {
-            let val = self.ax&0xff;
-            let mut lo = val & 0xf;
-            let mut hi = val >> 4;
-            let mut carry = false;
-            if self.getAflag()
+            let oldAl=self.ax&0xff;
+            let oldCf=self.getCflag();
+            let mut al=oldAl;
+
+            if ((al&0x0f)>9) || self.getAflag()
             {
-                lo -= 10;
-                hi += 1;
+                al=al.wrapping_add(6);
+                self.setAflag(true);
             }
-            if lo > 9
+            else
             {
-                lo -= 10;
-                hi += 1;
-            }
-            if hi > 9 || self.getCflag()
-            {
-                hi -= 10;
-                carry = true;
+                self.setAflag(false);
             }
 
-            let result = lo | (hi<<4);
-            self.ax=(self.ax&0xff00)|result;
-            self.setCflag(carry);
-            self.setAflag(false);
+            if (oldAl>0x99) || oldCf
+            {
+                al=al.wrapping_add(0x60);
+                self.setCflag(true);
+            }
+            else
+            {
+                self.setCflag(false);
+            }
+        
+            self.ax=(self.ax&0xff00)|(al&0xff);
 
-            self.doZflag(result);
-            self.doPflag(result);
-            self.doSflag(result,8);
+            self.doZflag(al);
+            self.doPflag(al);
+            self.doSflag(al,8);
 
             self.ip+=self.decInstr.insLen as u16;
         }
@@ -4299,9 +4354,9 @@ impl x86cpu
             al &= 0x0F;
             self.ax=al|(ah<<8);
 
-            self.doZflag(self.ax&0xff);
-            self.doPflag(self.ax&0xff);
-            self.doSflag(self.ax&0xff,8);
+            //self.doZflag(self.ax&0xff);
+            //self.doPflag(self.ax&0xff);
+            //self.doSflag(self.ax&0xff,8);
 
             self.ip+=self.decInstr.insLen as u16;
         }
