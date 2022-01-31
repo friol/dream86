@@ -15,8 +15,10 @@ To compile and run dream86:
 cargo run --release <disk image full path> <com name> <runmode>
 ```
 
-where: 
+where: <br/>
+<br/>
+"disk image full path" is the path of a 1.44 .img disk image<br/>
+"com name" is the name of a .com program (used only with runmode=1 or 2)<br/>
+"runmode" is 0 to run the disk image, 1 to run the com file at the 2nd parameter and 2 to run a .bin file from artlav's test suite<br/>
 
-"disk image full path" is the path of a 1.44 .img disk image
-"com name" is the name of a .com program (used only with runmode=1 or 2)
-"runmode" is 0 to run the disk image, 1 to run the com file at the 2nd parameter and 2 to run a .bin file from artlav's test suite
+Have fun with dream86!
