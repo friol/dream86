@@ -60,6 +60,15 @@ impl vga
                 }
             }
         }
+        else if videomodeNum==0x06
+        {
+            // 640x200 2 colours
+            self.mode=0x06;
+            for idx in 0..self.cgaFramebuffer.len()
+            {
+                self.cgaFramebuffer[idx]=0;
+            }
+        }
         else if videomodeNum==0x0d
         {
             // EGA 320x200x16
@@ -441,6 +450,66 @@ impl vga
                 if shifter<0
                 {
                     shifter=6;
+                    if adder==0x2000 { fbidx+=1; }
+                    curbyte+=1;
+                    if curbyte==80
+                    {
+                        curbyte=0;                        
+                        currow+=1;
+                        if (currow%2)==0 { adder=0; }
+                        else { adder=0x2000; }
+                    }
+                }
+            }
+        }
+        else if self.mode==0x06
+        {
+            let mut adder=0;
+            let mut currow=0;
+            let mut curbyte=0;
+            let mut fbidx=0;
+            let mut shifter=7;
+
+            // even rows
+            for pix in gui.frameBuffer.iter_mut()
+            {
+                let theByte=self.cgaFramebuffer[adder+fbidx];
+                let b0:usize=((theByte>>shifter)&0x01) as usize;
+                if adder==0 { if b0>0 { *pix=0xffffff; } else { *pix=0; } }
+                shifter-=1;
+
+                if shifter<0
+                {
+                    shifter=7;
+                    if adder==0 { fbidx+=1; }
+                    curbyte+=1;
+                    if curbyte==80
+                    {
+                        curbyte=0;                        
+                        currow+=1;
+                        if (currow%2)==0 { adder=0; }
+                        else { adder=0x2000; }
+                    }
+                }
+            }
+
+            adder=0;
+            currow=0;
+            curbyte=0;
+            fbidx=0;
+            shifter=6;
+
+            // odd rows
+            for pix in gui.frameBuffer.iter_mut()
+            {
+                let theByte=self.cgaFramebuffer[adder+fbidx];
+                let b0:usize=((theByte>>shifter)&0x01) as usize;
+                if adder==0x2000 { if b0>0 { *pix=0xffffff; } else { *pix=0; } }
+                shifter-=1;
+
+                if shifter<0
+                {
+                    shifter=7;
                     if adder==0x2000 { fbidx+=1; }
                     curbyte+=1;
                     if curbyte==80

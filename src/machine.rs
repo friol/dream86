@@ -118,8 +118,9 @@ impl machine
     {
         if addr8==0x40
         {
-            let num:u16 = rand::thread_rng().gen_range(0..256);
-            pcpu.ax=(pcpu.ax&0xff00)|num;    
+            // PIT Channel 0 data port
+            let num:u16=(0xff-(self.clockTicker&0xff)) as u16;
+            pcpu.ax=(pcpu.ax&0xff00)|num;
         }
         else if addr8==0x60
         {

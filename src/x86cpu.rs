@@ -853,17 +853,19 @@ impl x86cpu
 
             let result=ax64*mul64;
             let dst:u16=(result&0xffff) as u16;
-            //self.moveToDestination(&dst,&operand1,pmachine,pvga);
             self.ax=dst;
             self.dx=((result>>16)&0xffff) as u16;
 
-            // TODO right?
-            if (self.dx&0x8000)==0x8000 { self.setCflag(true); }
-            else { self.setCflag(false); }
-            if (self.dx&0x8000)==0x8000 { self.setSflag(true); }
-            else { self.setSflag(false); }
-            self.doZflag(dst);
-            //self.doPflag(quotient as u16); // todo check p flag
+            if (self.dx)>0 
+            { 
+                self.setCflag(true); 
+                self.setOflag(true); 
+            }
+            else
+            {
+                self.setCflag(false); 
+                self.setOflag(false); 
+            }
         }
         else
         {
@@ -872,11 +874,16 @@ impl x86cpu
 
             self.ax=(mul16*al) as u16;
 
-            if (self.ax&0x8000)==0x8000 { self.setCflag(true); }
-            else { self.setCflag(false); }
-            if (self.ax&0x8000)==0x8000 { self.setSflag(true); }
-            else { self.setSflag(false); }
-            self.doZflag(self.ax);
+            if (self.ax&0xff00)>0 
+            { 
+                self.setCflag(true); 
+                self.setOflag(true);
+            }
+            else
+            {
+                self.setCflag(false); 
+                self.setOflag(false);
+            }
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -963,42 +970,100 @@ impl x86cpu
 
     fn performIdiv(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        // TODO 
         let operand1=self.decInstr.operand1.clone();
 
         if self.decInstr.instrSize==16
         {
-            // Gaaaahh TODO recheck
-            let dx32:i32=self.dx as i32;
-            let ax32:i32=self.ax as i32;
-            let dv32:i32=self.getOperandValue(&operand1,pmachine,pvga) as i16 as i32;
+            let dx32:u32=self.dx as u32;
+            let ax32:u32=self.ax as u32;
+            let dv32:u32=self.getOperandValue(&operand1,pmachine,pvga) as u32;
 
-            if dv32!=0
+            let mut	d1:u32;
+            let mut	d2:u32;
+            let mut	s1:u32;
+            let mut	s2:u32;
+            let mut sign:bool=false;
+        
+            if dv32 == 0
             {
-                let val2divide:i32=ax32|(dx32<<16);
-                let modulo=val2divide%dv32;
-                let quotient=val2divide/dv32;
-                self.dx=modulo as u16;
-                self.ax=quotient as u16;
-
-                self.doZflag(quotient as u16);
-                //self.doPflag(quotient as u16); // todo check p flag
+                // TODO trigger INT0
+                self.ip+=self.decInstr.insLen as u16;
+                return;
             }
+        
+            s1 = ax32|(dx32<<16);
+            s2 = dv32;
+            
+            if (s2 & 0x8000)>0
+            {
+                s2=s2|0xffff0000;
+            }
+
+            if ((s1 ^ s2) & 0x80000000) != 0
+            {
+                sign=true;
+            }
+
+            if s1 >= 0x80000000 { s1=(!s1 + 1) & 0xffffffff; }
+            if s2 >= 0x80000000 { s2=(!s2 + 1) & 0xffffffff; }
+
+            d1 = s1 / s2;
+            d2 = s1 % s2;
+
+            /*if (d1 & 0xFFFF0000) {
+                // TODO trigger INT0
+            }*/
+        
+            if sign 
+            {
+                d1 = (!d1 + 1) & 0xffff;
+                d2 = (!d2 + 1) & 0xffff;
+            }
+        
+            self.ax = d1 as u16;
+            self.dx = d2 as u16;            
         }
         else
         {
-            let dv32:i32=self.getOperandValue(&operand1,pmachine,pvga) as i8 as i32;
-            let val2divide:i32=self.ax as i16 as i32;
+            let mut s1:u16=self.ax;
+            let mut s2:u16=self.getOperandValue(&operand1,pmachine,pvga) as u16;
+            let mut d1:u16;
+            let mut d2:u16;
+            let mut sign:bool=false;
 
-            if dv32!=0
+            /*if (d2==0) {
+                // TODO trigger int0
+            }*/
+
+            if ((s1 ^ s2) & 0x8000) != 0
             {
-                let modulo=val2divide%dv32;
-                let quotient=val2divide/dv32;
-                self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
-    
-                self.doZflag(quotient as u16);
-                //self.doPflag(quotient as u16); // todo check p flag
+                sign=true;
             }
+
+            if s1>=0x8000
+            {
+                s1=(!s1 + 1) & 0xffff;
+            }
+
+            if s2>=0x8000
+            {
+                s2=(!s2 + 1) & 0xffff;
+            }
+
+            d1 = s1 / s2;
+            d2 = s1 % s2;
+
+            /*if (d1 & 0xFF00) {
+                // TODO trigger int0
+            }*/
+        
+            if sign 
+            {
+                d1 = (!d1 + 1) & 0xff;
+                d2 = (!d2 + 1) & 0xff;
+            }
+        
+            self.ax=((d1 as u16)&0xff)|((d2 as u16)<<8);
         }
 
         self.ip+=self.decInstr.insLen as u16;

@@ -172,7 +172,8 @@ fn main()
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x0) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x49f6) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
-                //if (theCPU.cs==0x0e0b) && (theCPU.ip==0x00cf)
+                //if (theCPU.cs==0x0e88) && (theCPU.ip==0x02ed)
+                //if (theCPU.cs==0x050) && (theCPU.ip==0x7b16)
                 if false
                 {
                     bailOut=true;

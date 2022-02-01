@@ -91,9 +91,10 @@ impl guiif
         else if videomode==0x03 { vwidth=720; vheight=400; }
         else if videomode==0x04 { vwidth=320; vheight=200; }
         else if videomode==0x05 { vwidth=320; vheight=200; }
+        else if videomode==0x06 { vwidth=640; vheight=200; }
         else if videomode==0x0d { vwidth=320; vheight=200; }
 
-        if videomode==0x13 || videomode==0x04  || videomode==0x05 || videomode==0x0d
+        if videomode==0x13 || videomode==0x04  || videomode==0x05 || videomode==0x0d || videomode==0x06
         {
             window=Window::new("dream86",vwidth as usize,vheight as usize,WindowOptions {
                 scale: Scale::X2,
@@ -286,13 +287,15 @@ impl guiif
     {
         let mut ypos=self.dbgInstrLine;
         let mut stdout = stdout();
-        for idx in 0..instrs.len()
+
+        for instr in instrs
         {
             stdout.queue(cursor::MoveTo(5,ypos)).ok();
-            if idx==0 { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white().negative())).ok(); }
-            else { stdout.queue(style::PrintStyledContent(instrs[idx].clone().white())).ok(); }
+            if ypos==self.dbgInstrLine { stdout.queue(style::PrintStyledContent(instr.clone().white().negative())).ok(); }
+            else { stdout.queue(style::PrintStyledContent(instr.clone().white())).ok(); }
             ypos+=1;
         }
+
         stdout.flush().ok();
     }
 
