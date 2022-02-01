@@ -21,4 +21,8 @@ where: <br/>
 "com name" is the name of a .com or .bin program (used only with runmode=1 or 2)<br/>
 "runmode" is 0 to run the disk image, 1 to run the com file at the 2nd parameter and 2 to run a .bin file from artlav's test suite<br/>
 
+dream86 uses the plug-in BIOS from 8086tiny:
+
+https://github.com/alblue/8086tiny
+
 Have fun with dream86!
