@@ -892,26 +892,28 @@ impl x86cpu
     // unsigned multiply
     fn performMul(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        // TODO 
         let operand1=self.decInstr.operand1.clone();
 
         if self.decInstr.instrSize==16
         {
-            let mul64:i64=self.getOperandValue(&operand1,pmachine,pvga) as i64;
-            let ax64:i64=self.ax as i64;
+            let mul64:u32=self.getOperandValue(&operand1,pmachine,pvga) as u32;
+            let ax64:u32=self.ax as u32;
 
             let result=ax64*mul64;
             let dst:u16=(result&0xffff) as u16;
             self.ax=dst;
             self.dx=((result>>16)&0xffff) as u16;
 
-            // TODO right?
-            if (self.dx&0x8000)==0x8000 { self.setCflag(true); }
-            else { self.setCflag(false); }
-            if (self.dx&0x8000)==0x8000 { self.setSflag(true); }
-            else { self.setSflag(false); }
-            self.doZflag(dst);
-            //self.doPflag(quotient as u16); // todo check p flag
+            if self.dx>0
+            { 
+                self.setCflag(true); 
+                self.setOflag(true); 
+            }
+            else 
+            { 
+                self.setCflag(false); 
+                self.setOflag(false); 
+            }
         }
         else
         {
@@ -921,14 +923,16 @@ impl x86cpu
             let result=m1*m2;
             self.ax=result;
 
-            // TODO right?
-            if (self.ax&0x8000)==0x8000 { self.setCflag(true); }
-            else { self.setCflag(false); }
-            if (self.ax&0x8000)==0x8000 { self.setSflag(true); }
-            else { self.setSflag(false); }
-            self.doZflag(result);
-
-            //self.abort(&format!("Unhandled MUL 8bit {}",operand1));
+            if (self.ax&0xff00)>0 
+            { 
+                self.setCflag(true); 
+                self.setOflag(true); 
+            }
+            else 
+            { 
+                self.setCflag(false); 
+                self.setOflag(false); 
+            }
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -945,24 +949,55 @@ impl x86cpu
             let ax32:u32=self.ax as u32;
             let dv32:u32=self.getOperandValue(&operand1,pmachine,pvga) as u32;
             let val2divide:u32=ax32|(dx32<<16);
+
+            if dv32 == 0
+            {
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
+
+            if (val2divide/dv32)>0xffff
+            {
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
+
             let modulo=val2divide%dv32;
             let quotient=val2divide/dv32;
-            self.dx=modulo as u16;
-            self.ax=quotient as u16;
 
-            self.doZflag(quotient as u16);
-            //self.doPflag(quotient as u16); // todo check p flag
+            self.dx=(modulo&0xffff) as u16;
+            self.ax=(quotient&0xffff) as u16;
         }
         else
         {
-            let dv32:u32=self.getOperandValue(&operand1,pmachine,pvga) as u32;
-            let val2divide:u32=self.ax as u32;
+            let dv32:u16=self.getOperandValue(&operand1,pmachine,pvga);
+            let val2divide:u16=self.ax;
+
+            if dv32 == 0
+            {
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
+
+            if (val2divide/dv32)>0xff
+            {
+                // TODO trigger INT0
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
+
             let modulo=val2divide%dv32;
             let quotient=val2divide/dv32;
-            self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
 
-            self.doZflag(quotient as u16);
-            //self.doPflag(quotient as u16); // todo check p flag
+            self.ax=((quotient as u16)&0xff)|((modulo as u16)<<8);
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -970,6 +1005,7 @@ impl x86cpu
 
     fn performIdiv(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
+        // TODO check int0
         let operand1=self.decInstr.operand1.clone();
 
         if self.decInstr.instrSize==16
@@ -988,6 +1024,8 @@ impl x86cpu
             {
                 // TODO trigger INT0
                 self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
                 return;
             }
         
@@ -1010,9 +1048,14 @@ impl x86cpu
             d1 = s1 / s2;
             d2 = s1 % s2;
 
-            /*if (d1 & 0xFFFF0000) {
+            if (d1&0xFFFF0000)>0 
+            {
                 // TODO trigger INT0
-            }*/
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
         
             if sign 
             {
@@ -1031,9 +1074,13 @@ impl x86cpu
             let mut d2:u16;
             let mut sign:bool=false;
 
-            /*if (d2==0) {
-                // TODO trigger int0
-            }*/
+            if s2==0
+            {
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
 
             if ((s1 ^ s2) & 0x8000) != 0
             {
@@ -1053,9 +1100,13 @@ impl x86cpu
             d1 = s1 / s2;
             d2 = s1 % s2;
 
-            /*if (d1 & 0xFF00) {
-                // TODO trigger int0
-            }*/
+            if (d1&0xFF00)>0
+            {
+                self.ip+=self.decInstr.insLen as u16;
+                self.isIntPending=true;
+                self.intPendingNum=0;
+                return;
+            }
         
             if sign 
             {
@@ -1911,6 +1962,12 @@ impl x86cpu
             adr=pmachine.readMemory16(readSeg,offset16,pvga);
             seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
         }
+        else if op1=="[BX]"
+        {
+            let offset16=self.bx;
+            adr=pmachine.readMemory16(readSeg,offset16,pvga);
+            seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
+        }
         else
         {
             self.abort(&format!("Call far {} at {:04x}:{:04x}",op1,self.cs,self.ip));
@@ -2632,6 +2689,7 @@ impl x86cpu
 
     fn doSbb(&mut self,srcVal:&u16,dstReg:&String,pmachine:&mut machine,pvga:&mut vga)
     {
+        // TODO carry seems wrong
         let op1=*srcVal;        
         let lop=self.getOperandValue(&dstReg,pmachine,pvga);
 
@@ -2845,7 +2903,15 @@ impl x86cpu
 
     fn performOut(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,self.decInstr.instrSize);
+        if self.decInstr.instrSize==8
+        {
+            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
+        }
+        else
+        {
+            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
+            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate+1,(self.ax>>8) as u8);
+        }
 
         self.ip+=self.decInstr.insLen as u16;
     }

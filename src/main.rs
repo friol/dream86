@@ -11,8 +11,8 @@
 
 use std::process;
 //use std::{thread, time};
-//use std::fs::File;
-//use std::io::prelude::*;
+use std::fs::File;
+use std::io::prelude::*;
 
 use std::env;
 use std::time::Instant;
@@ -53,7 +53,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x1665,0xfffe,80);
+        theGUI.drawMemory(&theVGA,&theMachine,0x0,0x0,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -105,14 +105,12 @@ fn main()
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
             }*/
-            _breakIt=true;
-            //theMachine.writeMemory(0xe0b,0x4f5,0x4,&mut theVGA);
-            //theMachine.writeMemory(0x977,0x3547,0x90,&mut theVGA);
-/*
+            //_breakIt=true;
+
             //let mut f = match File::open("./programs/tests/res_add.bin") {
             //let mut f = match File::open("./programs/tests/res_cmpneg.bin") {
             //let mut f = match File::open("./programs/tests/res_shifts.bin") {
-            let mut f = match File::open("./programs/tests/res_datatrnf.bin") {
+            let mut f = match File::open("./programs/tests/res_sub.bin") {
                 Ok(f) => f,
                 Err(e) => {
                     println!("Unable to open file error:{}",e);
@@ -126,13 +124,13 @@ fn main()
             for _b in 0..comLen
             {
                 let curb=theMachine.readMemory(0x0,_b as u16,&mut theVGA);
-                if curb!=data[_b]
+                if (curb!=data[_b]) && (data[_b]!=0)
                 {
                     println!("fck at byte {:04x} curb {:02x} reference {:02x}",_b,curb,data[_b]);
                     return;
                 }
             }
-*/    
+    
         }
         else if act==guiif::keyAction::actionIncDebugCursor
         {
@@ -164,8 +162,8 @@ fn main()
                 theMachine.update(&mut theCPU);
                 inum+=1;
 
-                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100) // start of itest.com
-                //if (theCPU.cs==0x5250) && (theCPU.ip==0x4de3) // arkanoid before taito logo
+                //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100) // start of .com
+                //if (theCPU.cs==0x5250) && (theCPU.ip==0x4da4) // arkanoid before splash screen
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x4110)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x413a)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h

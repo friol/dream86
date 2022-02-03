@@ -90,7 +90,7 @@ impl machine
         self.keyboardQueue.push(ks);
     }
 
-    pub fn handleOut(&mut self,pcpu:&mut x86cpu,pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
+    pub fn handleOut(&mut self,pcpu:&mut x86cpu,pvga:&mut vga,addr8:u8,addr16:u16,val:u8)
     {
         if addr16==0x03C6
         {
@@ -100,12 +100,32 @@ impl machine
         else if addr16==0x03C8
         {
             // set palette color index for VGA
-            pvga.write0x3c8((pcpu.ax&0xff) as u8);
+            pvga.write0x3c8(val);
         }
         else if addr16==0x03C9
         {
             // write r-g-b for VGA palette
-            pvga.write0x3c9((pcpu.ax&0xff) as u8);
+            pvga.write0x3c9(val);
+        }
+        else if addr16==0x03C4
+        {
+            // EGA sequencer registers select
+            pvga.write0x3c4(val);
+        }
+        else if addr16==0x03C5
+        {
+            // EGA sequencer registers
+            pvga.write0x3c5(val);
+        }
+        else if addr16==0x03CE
+        {
+            // EGA graphics register select
+            pvga.write0x3ce(val);
+        }
+        else if addr16==0x03cf
+        {
+            // EGA graphics controller registers
+            // TODO
         }
         else if (addr8==0x20) || (addr16==0x20)
         {

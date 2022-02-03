@@ -16,7 +16,11 @@ pub struct vga
     pub cursory:usize,
     pub vgaPalette: Vec<u32>,
     pub vgaPaletteCurColor: u8,
-    pub vgaPaletteIndexRGB: u8
+    pub vgaPaletteIndexRGB: u8,
+    pub egaRegister3ceSelected: u8,
+    pub egaRegister3cfValues: Vec<u8>,
+    pub egaRegister3c4Selected: u8,
+    pub egaRegister3c5Values: Vec<u8>
 }
 
 impl vga
@@ -133,7 +137,30 @@ impl vga
     {
         if (addr>=0xa0000) && (addr<=0xaffff)
         {
-            self.framebuffer[(addr-0xa0000) as usize]=val;
+            if self.mode==0x0d
+            {
+                let bitplane=self.egaRegister3c5Values[2];
+                if (bitplane&0x01)>0
+                {
+                    self.framebuffer[((addr-0xa0000)&0xffff) as usize]=val;
+                }
+                if (bitplane&0x02)>0
+                {
+                    self.framebuffer[((addr-0xa0000+0x2000)&0xffff) as usize]=val;
+                }
+                if (bitplane&0x04)>0
+                {
+                    self.framebuffer[((addr-0xa0000+0x4000)&0xffff) as usize]=val;
+                }
+                if (bitplane&0x08)>0
+                {
+                    self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=val;
+                }
+            }
+            else
+            {
+                self.framebuffer[(addr-0xa0000) as usize]=val;
+            }
         }
         else if (addr>=0xb8000) && (addr<=0xbffff)
         {
@@ -302,6 +329,21 @@ impl vga
             self.vgaPaletteIndexRGB=0;
             self.vgaPaletteCurColor+=1;
         }
+    }
+
+    pub fn write0x3ce(&mut self,val: u8)
+    {
+        self.egaRegister3ceSelected=val;
+    }
+
+    pub fn write0x3c4(&mut self,val: u8)
+    {
+        self.egaRegister3c4Selected=val;
+    }
+
+    pub fn write0x3c5(&mut self,val: u8)
+    {
+        self.egaRegister3c5Values[self.egaRegister3c4Selected as usize]=val;
     }
 
     pub fn fbTobuf32(&self,gui:&mut guiif)
@@ -595,6 +637,9 @@ impl vga
                 ]
         );
 
+        let reg3c5Values=Vec::from([0,0,0,0,0]); // 5 registers
+        let reg3cfValues=Vec::from([0,0,0,0,0,0,0,0,0]); // 9 registers
+
         vga
         {
             mode: 2,
@@ -607,7 +652,11 @@ impl vga
             cursory:0,
             vgaPalette: defaultVgaPalette,
             vgaPaletteCurColor: 0,
-            vgaPaletteIndexRGB: 0
+            vgaPaletteIndexRGB: 0,
+            egaRegister3c4Selected: 0,
+            egaRegister3c5Values: reg3c5Values,
+            egaRegister3ceSelected: 0,
+            egaRegister3cfValues: reg3cfValues
         }
     }
 }
