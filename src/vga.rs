@@ -20,7 +20,8 @@ pub struct vga
     pub egaRegister3ceSelected: u8,
     pub egaRegister3cfValues: Vec<u8>,
     pub egaRegister3c4Selected: u8,
-    pub egaRegister3c5Values: Vec<u8>
+    pub egaRegister3c5Values: Vec<u8>,
+    pub egaDataLatch: Vec<u8>
 }
 
 impl vga
@@ -110,12 +111,33 @@ impl vga
         self.cursory=py as usize;
     }
 
+    pub fn putpixel(&mut self,color:u8,column:u16,row:u16)
+    {
+        if self.mode==0x04 || self.mode==0x05
+        {
+            let mut addr=(row/4)+(column*80);
+            if (row%2)>0 { addr+=0x2000; }
+            let bit2=column%4;
+            self.cgaFramebuffer[addr as usize]=self.cgaFramebuffer[addr as usize]&((color&0x3)<<(3-bit2));
+        }
+        else
+        {
+            println!("Bailing out: vga::putpixel for unhandled mode {:02x}",self.mode);
+            process::exit(0x0100);
+        }
+    }
+
     //
 
-    pub fn readMemory(&self,addr:i64) -> u8
+    pub fn readMemory(&mut self,addr:i64) -> u8
     {
         if (addr>=0xa0000) && (addr<=(0xaffff))
         {
+            let egaOffs=addr&0x1fff;
+            for plane in 0..4
+            {
+                self.egaDataLatch[plane]=self.framebuffer[(egaOffs+((plane as i64)*0x2000)) as usize];
+            }
             return self.framebuffer[(addr-0xa0000) as usize];
         }
         else if (addr>=0xb8000) && (addr<=0xbffff)
@@ -126,7 +148,7 @@ impl vga
         return 0;
     }
 
-    pub fn readMemory16(&self,addr:i64) -> u16
+    pub fn readMemory16(&mut self,addr:i64) -> u16
     {
         let lobyte=self.readMemory(addr) as u16;
         let hibyte=self.readMemory(addr+1) as u16;
@@ -137,24 +159,55 @@ impl vga
     {
         if (addr>=0xa0000) && (addr<=0xaffff)
         {
-            if self.mode==0x0d
+            // if ega videomode is 0x0d and write mode is 0
+            if (self.mode==0x0d) && (self.egaRegister3cfValues[5]==0)
             {
+                let mut realVal=val;
                 let bitplane=self.egaRegister3c5Values[2];
+                let reg3_ega3cf=self.egaRegister3cfValues[3];
+                let reg8_ega3cf=self.egaRegister3cfValues[8];
+
+                let latchNum=(addr-0xa0000)>>13;
+
+                // data rotate reg bits 3&4: 
+                if (reg3_ega3cf&0x18)==0x18
+                {
+                    // 1,1 -> data is XORed with latch data
+                    realVal=realVal^self.egaDataLatch[latchNum as usize];
+                }
+                else if (reg3_ega3cf&0x18)==0x8
+                {
+                    // 0,1 -> data is AND'd with latch data
+                    realVal=realVal&self.egaDataLatch[latchNum as usize];
+                }
+                else if (reg3_ega3cf&0x18)==0x10
+                {
+                    // 1,0 -> data is OR'd with latch data
+                    realVal=realVal|self.egaDataLatch[latchNum as usize];
+                }
+                else if reg3_ega3cf!=0
+                {
+                    println!("Bailing out: vga::other function {:02x}",reg3_ega3cf);
+                    process::exit(0x0100);
+                }
+
+                realVal = (realVal & reg8_ega3cf) | (self.egaDataLatch[latchNum as usize] & (!reg8_ega3cf));
+
                 if (bitplane&0x01)>0
                 {
-                    self.framebuffer[((addr-0xa0000)&0xffff) as usize]=val;
+                    self.framebuffer[((addr-0xa0000)&0xffff) as usize]=realVal;
                 }
                 if (bitplane&0x02)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x2000)&0xffff) as usize]=val;
+                    self.framebuffer[((addr-0xa0000+0x2000)&0xffff) as usize]=realVal;
                 }
                 if (bitplane&0x04)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x4000)&0xffff) as usize]=val;
+                    self.framebuffer[((addr-0xa0000+0x4000)&0xffff) as usize]=realVal;
                 }
                 if (bitplane&0x08)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=val;
+                    self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=realVal;
                 }
             }
             else
@@ -333,7 +386,25 @@ impl vga
 
     pub fn write0x3ce(&mut self,val: u8)
     {
+        /*
+            reg             use
+            ----------------------------------------------------------------------
+            0               Set/reset <what I don't know>
+            1               enable set/reset
+            2               Color compare
+            3               Data rotate value
+            4               Memory plane to read
+            5               Mode register 1
+            6               Mode register 2
+            7               Ignore color compare
+            8               Bit mask for plane change        
+        */
         self.egaRegister3ceSelected=val;
+    }
+
+    pub fn write0x3cf(&mut self,val: u8)
+    {
+        self.egaRegister3cfValues[self.egaRegister3ceSelected as usize]=val;
     }
 
     pub fn write0x3c4(&mut self,val: u8)
@@ -639,6 +710,7 @@ impl vga
 
         let reg3c5Values=Vec::from([0,0,0,0,0]); // 5 registers
         let reg3cfValues=Vec::from([0,0,0,0,0,0,0,0,0]); // 9 registers
+        let latches=Vec::from([0,0,0,0]);
 
         vga
         {
@@ -656,7 +728,8 @@ impl vga
             egaRegister3c4Selected: 0,
             egaRegister3c5Values: reg3c5Values,
             egaRegister3ceSelected: 0,
-            egaRegister3cfValues: reg3cfValues
+            egaRegister3cfValues: reg3cfValues,
+            egaDataLatch: latches
         }
     }
 }

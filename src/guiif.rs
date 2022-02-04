@@ -387,7 +387,7 @@ impl guiif
         stdout.flush().ok();
     }
 
-    pub fn drawMemory(&self,pvga:&vga,pmachine:&machine,startSegment:u16,startOffset:u16,numBytes:u16)
+    pub fn drawMemory(&self,pvga:&mut vga,pmachine:&machine,startSegment:u16,startOffset:u16,numBytes:u16)
     {
         let mut varOffset:i64=startOffset.into();
         let mut stdout = stdout();

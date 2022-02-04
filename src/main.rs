@@ -53,7 +53,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&theVGA,&theMachine,0x0,0x0,80);
+        theGUI.drawMemory(&mut theVGA,&theMachine,0x0,0x0,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -201,7 +201,7 @@ fn main()
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&theVGA,&theMachine,0x0dfb,0x49f0,80);
+                    theGUI.drawMemory(&mut theVGA,&theMachine,0x0dfb,0x49f0,80);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 

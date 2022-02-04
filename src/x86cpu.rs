@@ -392,6 +392,11 @@ impl x86cpu
                 let theAddr:i32=(self.bx as i32)+(self.di as i32)+(self.decInstr.displacement as i32);
                 dst=theAddr as u16;
             }
+            else if operand1.contains("[BX+SI+Disp]")
+            {
+                let theAddr:i32=(self.bx as i32)+(self.si as i32)+(self.decInstr.displacement as i32);
+                dst=theAddr as u16;
+            }
             else if operand1.contains("[BP+DI+Disp]")
             {
                 let theAddr:i32=(self.bp as i32)+(self.di as i32)+(self.decInstr.displacement as i32);
@@ -1319,7 +1324,7 @@ impl x86cpu
         self.ip+=self.decInstr.insLen as u16;
     }
 
-    fn performLods(&mut self,pmachine:&machine,pvga:&vga)
+    fn performLods(&mut self,pmachine:&machine,pvga:&mut vga)
     {
         // LODSB/LODSW
         let mut readSeg:u16=self.ds;
@@ -1362,12 +1367,8 @@ impl x86cpu
         else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
         else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
 
-        if self.decInstr.repPrefix=="REPNE"
-        {
-            self.abort("Unhandled REPNE movs");
-        }
-
-        if self.decInstr.repPrefix=="REPE"
+        // repe is the same as repne (?)
+        if (self.decInstr.repPrefix=="REPE") || (self.decInstr.repPrefix=="REPNE")
         {
             if self.cx!=0
             {
@@ -1492,7 +1493,7 @@ impl x86cpu
     }
 
     // the instruction that scas'd everything
-    fn performScas(&mut self,pmachine:&machine,pvga:&vga)
+    fn performScas(&mut self,pmachine:&machine,pvga:&mut vga)
     {
         let mut readSeg:u16=self.es;
         if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
@@ -1650,7 +1651,7 @@ impl x86cpu
         }
     }
 
-    fn performCmps(&mut self,pmachine:&machine,pvga:&vga)
+    fn performCmps(&mut self,pmachine:&machine,pvga:&mut vga)
     {
         let mut readSeg:u16=self.ds;
         if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
@@ -1938,6 +1939,12 @@ impl x86cpu
             adr=pmachine.readMemory16(readSeg,offset16,pvga);
             seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
         }
+        else if op1.contains("[SI+Disp]")
+        {
+            let offset16=self.si+self.decInstr.displacement as u16;
+            adr=pmachine.readMemory16(readSeg,offset16,pvga);
+            seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
+        }
         else if op1.contains("[BP+Disp]")
         {
             let mut readSeg:u16=self.ss;
@@ -1959,6 +1966,12 @@ impl x86cpu
         else if op1=="[DI]"
         {
             let offset16=self.di;
+            adr=pmachine.readMemory16(readSeg,offset16,pvga);
+            seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
+        }
+        else if op1=="[SI]"
+        {
+            let offset16=self.si;
             adr=pmachine.readMemory16(readSeg,offset16,pvga);
             seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
         }
@@ -3426,7 +3439,7 @@ impl x86cpu
     fn prepareInstructionParameters(&self,opcodeInfo:&[&str;7],cs:u16,ip:u16,instrLen:&mut u8,dbgStr:&mut String,instrWidth:&u8,
                                     u8op:&mut u8,u16op:&mut u16,daddr:&mut u16,
                                     opsrc:&mut String,opdst:&mut String,displ:&mut i32,displSize:&mut u8,iType:&instructionType,
-                                    pmachine:&machine,pvga:&vga) -> bool
+                                    pmachine:&machine,pvga:&mut vga) -> bool
     {
         if *iType==instructionType::instrJmpShort
         {
@@ -3776,7 +3789,7 @@ impl x86cpu
         return true;
     }
 
-    fn expandWideInstruction(&self,opcode:&u8,wideOpcode:&mut u16,pmachine:&machine,pvga:&vga,cs:&u16,ip:&u16)
+    fn expandWideInstruction(&self,opcode:&u8,wideOpcode:&mut u16,pmachine:&machine,pvga:&mut vga,cs:&u16,ip:&u16)
     {
         if (*opcode==0xf7) || (*opcode==0xff) || (*opcode==0x80) || (*opcode==0xfe) || (*opcode==0xd2) ||
            (*opcode==0xc1) || (*opcode==0x81) || (*opcode==0x83) || (*opcode==0xd0) || (*opcode==0xf6) || 
@@ -3793,7 +3806,7 @@ impl x86cpu
         }
     }
 
-    pub fn dekode(&mut self,pmachine:&machine,pvga:&vga,cs:u16,ip:u16) -> bool
+    pub fn dekode(&mut self,pmachine:&machine,pvga:&mut vga,cs:u16,ip:u16) -> bool
     {
         //
         // decode an 8086 instruction (also get debugging info)
@@ -4083,7 +4096,7 @@ impl x86cpu
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
             //if (intNum==0x1c) || (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) || (intNum==0x28) || (intNum==0x3f) || (intNum==131)
-            if intNum>=0x1c
+            if (intNum>=0x1c) || intNum==0x08 || intNum==0x18
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
                 let newcs=pmachine.readMemory16(0x0,((intNum as u16)*4)+2,pvga);
@@ -4170,6 +4183,16 @@ impl x86cpu
                 else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
     
                 offs=self.bp+self.si+self.decInstr.displacement as u16;
+            }
+            else if self.decInstr.operand1.contains("[BP+Disp]")
+            {
+                readSeg=self.ss;
+                if self.decInstr.segOverride=="CS" { readSeg=self.cs; }
+                else if self.decInstr.segOverride=="SS" { readSeg=self.ss; }
+                else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
+                else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
+    
+                offs=self.bp+self.decInstr.displacement as u16;
             }
             else if self.decInstr.operand1=="Direct Addr"
             {

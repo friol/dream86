@@ -125,7 +125,7 @@ impl machine
         else if addr16==0x03cf
         {
             // EGA graphics controller registers
-            // TODO
+            pvga.write0x3cf(val);
         }
         else if (addr8==0x20) || (addr16==0x20)
         {
@@ -244,6 +244,15 @@ impl machine
                 {
                     pvga.outputCharToStdout(ch); 
                 }
+            }
+            else if (pcpu.ax&0xff00)==0x0c00
+            {
+                // AH=0c - Write Graphics Pixel at Coordinate
+                let color:u8=(pcpu.ax&0xff) as u8;
+                let column:u16=pcpu.cx;
+                let row:u16=pcpu.dx;
+
+                pvga.putpixel(color,column,row); 
             }
             else if (pcpu.ax&0xff00)==0x0600
             {
@@ -418,6 +427,14 @@ impl machine
             else if (pcpu.ax&0xff00)==0x0300
             {
                 // INT 13,3 - Write Disk Sectors
+                // TODO
+                pcpu.ax&=0xff;
+                pcpu.setCflag(false); // CF = 0 if successful
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x0400
+            {
+                // INT 13,4 - Verify Disk Sectors
                 // TODO
                 pcpu.ax&=0xff;
                 pcpu.setCflag(false); // CF = 0 if successful
@@ -773,7 +790,7 @@ impl machine
         return retval;
     }
 
-    pub fn readMemory(&self,segment:u16,address:u16,pvga:&vga) -> u8
+    pub fn readMemory(&self,segment:u16,address:u16,pvga:&mut vga) -> u8
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
@@ -788,7 +805,7 @@ impl machine
         return self.ram[(flatAddr&0xfffff) as usize];
     }
 
-    pub fn readMemory16(&self,segment:u16,address:u16,pvga:&vga) -> u16
+    pub fn readMemory16(&self,segment:u16,address:u16,pvga:&mut vga) -> u16
     {
         let i64seg:i64=segment.into();
         let i64addr:i64=address.into();
