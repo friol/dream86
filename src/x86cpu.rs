@@ -1456,13 +1456,8 @@ impl x86cpu
             else
             {
                 pmachine.writeMemory16(self.es,self.di,self.ax,pvga);
-                if self.getDflag() { self.di-=2; }
-                else 
-                { 
-                    let mut di32:i32=self.di as i32;
-                    di32+=2; 
-                    self.di=(di32&0xffff) as u16;
-                }
+                if self.getDflag() { self.di=self.di.wrapping_sub(2); }
+                else { self.di=self.di.wrapping_add(2); }
                 self.ip+=1;
             }
         }
@@ -1473,8 +1468,8 @@ impl x86cpu
                 if self.cx!=0
                 {
                     pmachine.writeMemory(self.es,self.di,(self.ax&0xff) as u8,pvga);
-                    if self.getDflag() { self.di-=1; }
-                    else { self.di+=1; }
+                    if self.getDflag() { self.di=self.di.wrapping_sub(1); }
+                    else { self.di=self.di.wrapping_add(1); }
                     self.cx-=1;
                 }
                 else
@@ -1485,8 +1480,8 @@ impl x86cpu
             else
             {
                 pmachine.writeMemory(self.es,self.di,(self.ax&0xff) as u8,pvga);
-                if self.getDflag() { self.di-=1; }
-                else { self.di+=1; }
+                if self.getDflag() { self.di=self.di.wrapping_sub(1); }
+                else { self.di=self.di.wrapping_add(1); }
                 self.ip+=1;
             }
         }
@@ -1888,6 +1883,7 @@ impl x86cpu
             if self.cx!=0 { performJump=true; } 
         }
         else if &self.decInstr.debugDecode[0..4]=="JCXZ" { if self.cx==0 { performJump=true; } }
+        else if &self.decInstr.debugDecode[0..6]=="CS JNE" { if !self.getZflag() { performJump=true; } }
         else
         {
             self.abort(&format!("Unhandled jump instr {}",self.decInstr.debugDecode));
@@ -2918,12 +2914,12 @@ impl x86cpu
     {
         if self.decInstr.instrSize==8
         {
-            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
+            pmachine.handleOut(pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
         }
         else
         {
-            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
-            pmachine.handleOut(self,pvga,self.decInstr.u8immediate,self.decInstr.u16immediate+1,(self.ax>>8) as u8);
+            pmachine.handleOut(pvga,self.decInstr.u8immediate,self.decInstr.u16immediate,(self.ax&0xff) as u8);
+            pmachine.handleOut(pvga,self.decInstr.u8immediate,self.decInstr.u16immediate+1,(self.ax>>8) as u8);
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -3292,6 +3288,9 @@ impl x86cpu
             0xef => { return ["OUT","16","2","AX","DX","OutNMRR","0"]; }            
             // NOP 
             0x90 => { return ["NOP","8","0","","","Nop","0"]; } // best instruction evah
+
+            0xf1 => { return ["NOP","8","0","","","Nop","0"]; }
+
             // SBB
             0x18 => { return ["SBB","8","2","rmb","rb","Sbb","0"]; }
             0x19 => { return ["SBB","16","2","rmw","rw","Sbb","0"]; }
@@ -3360,6 +3359,7 @@ impl x86cpu
             0x8306 => { return ["XOR","16","2","eb","rmw","Xor","0"]; }
             0x8307 => { return ["CMP","16","2","eb","rmw","Cmp","0"]; }
 
+            0xc000 => { return ["ROL","8","2","rmb","ib","Rol","1"]; }            // 186
             0xc001 => { return ["ROR","8","2","rmb","ib","Ror","1"]; }            // 186
             0xc004 => { return ["SHL","8","2","rmb","ib","Shl","1"]; }            // 186
             0xc005 => { return ["SHR","8","2","rmb","ib","Shl","1"]; }            // 186
@@ -3393,8 +3393,10 @@ impl x86cpu
             0xd300 => { return ["ROL","16","2","rmw","CL","Rol","1"]; }            
             0xd301 => { return ["ROR","16","2","rmw","CL","Ror","1"]; }            
             0xd302 => { return ["RCL","16","2","rmw","CL","Rcl","1"]; }            
+            0xd303 => { return ["RCR","16","2","rmw","CL","Rcr","1"]; }            
             0xd304 => { return ["SHL","16","2","rmw","CL","Shl","1"]; }            
             0xd305 => { return ["SHR","16","2","rmw","CL","Shr","1"]; }            
+            /*0xd306 => { return ["SHL","16","2","rmw","CL","Shl","1"]; } */ // does this exist?
             0xd307 => { return ["SAR","16","2","rmw","CL","Sar","1"]; }            
 
             0xf600 => { return ["TEST","8","2","ib","rmb","Test","0"]; }
@@ -4096,7 +4098,7 @@ impl x86cpu
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
             //if (intNum==0x1c) || (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) || (intNum==0x28) || (intNum==0x3f) || (intNum==131)
-            if (intNum>=0x1c) || intNum==0x08 || intNum==0x18
+            if (intNum>=0x1c) || intNum==0x08 || intNum==0x18 || intNum==0x19
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
                 let newcs=pmachine.readMemory16(0x0,((intNum as u16)*4)+2,pvga);
