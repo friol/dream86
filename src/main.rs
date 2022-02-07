@@ -11,8 +11,8 @@
 
 use std::process;
 //use std::{thread, time};
-use std::fs::File;
-use std::io::prelude::*;
+//use std::fs::File;
+//use std::io::prelude::*;
 
 use std::env;
 use std::time::Instant;
@@ -40,7 +40,7 @@ fn main()
 
     //
 
-    let mut theVGA=vga::vga::new("./fonts/9x16.png");
+    let mut theVGA=vga::vga::new("./fonts/9x16.png","./fonts/cga8.png");
     let mut theMachine=machine::machine::new(&comName,0x100000,runMode);
     let theDisk=fddController::fddController::new(diskImageName);
     let mut theCPU=x86cpu::x86cpu::new(runMode);
@@ -53,7 +53,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&mut theVGA,&theMachine,0x0,0x0,80);
+        theGUI.drawMemory(&mut theVGA,&theMachine,0x2881,0x68a0,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -69,6 +69,7 @@ fn main()
             let mut bytesRead=0;
             theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
             theMachine.update(&mut theCPU);
+            theVGA.update();
         }
         else if act==guiif::keyAction::actionRunToRet
         {
@@ -83,6 +84,7 @@ fn main()
             {
                 _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update(&mut theCPU);
+                theVGA.update();
 
                 if (iterations%1000)==0
                 {
@@ -105,8 +107,8 @@ fn main()
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update();
             }*/
-            //_breakIt=true;
-
+            _breakIt=true;
+/*
             //let mut f = match File::open("./programs/tests/res_add.bin") {
             //let mut f = match File::open("./programs/tests/res_cmpneg.bin") {
             //let mut f = match File::open("./programs/tests/res_shifts.bin") {
@@ -130,7 +132,7 @@ fn main()
                     return;
                 }
             }
-    
+*/    
         }
         else if act==guiif::keyAction::actionIncDebugCursor
         {
@@ -148,6 +150,7 @@ fn main()
             {
                 theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update(&mut theCPU);
+                theVGA.update();
             }
         }
         else if act==guiif::keyAction::actionRun
@@ -160,6 +163,7 @@ fn main()
             {
                 let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update(&mut theCPU);
+                theVGA.update();
                 inum+=1;
 
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x100) // start of .com

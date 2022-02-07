@@ -90,7 +90,7 @@ impl machine
         self.keyboardQueue.push(ks);
     }
 
-    pub fn handleOut(&mut self,pcpu:&mut x86cpu,pvga:&mut vga,addr8:u8,addr16:u16,val:u8)
+    pub fn handleOut(&mut self,pvga:&mut vga,addr8:u8,addr16:u16,val:u8)
     {
         if addr16==0x03C6
         {
@@ -127,6 +127,26 @@ impl machine
             // EGA graphics controller registers
             pvga.write0x3cf(val);
         }
+        else if addr16==0x03d9
+        {
+            // palette select for cga
+            pvga.write0x3d9(val);
+        }
+        else if (addr16==0x03b4) || (addr16==0x03d4)
+        {
+            // MDA CRT index register	 (EGA/VGA)
+            pvga.write0x3b4(val);            
+        }
+        else if (addr16==0x03b5) || (addr16==0x03d5)
+        {
+            // MDA CRT data register	 (EGA/VGA)
+            pvga.write0x3b5(val);            
+        }
+        else if (addr8==0x64) || (addr16==0x64)
+        {
+            println!("Out to port 0x64");
+            process::exit(0x0100);
+        }
         else if (addr8==0x20) || (addr16==0x20)
         {
             // MPICP0
@@ -134,7 +154,7 @@ impl machine
         }
     }
 
-    pub fn handleIn(&mut self,pcpu:&mut x86cpu,_pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
+    pub fn handleIn(&mut self,pcpu:&mut x86cpu,pvga:&mut vga,addr8:u8,addr16:u16,_bits:u8)
     {
         if addr8==0x40
         {
@@ -149,7 +169,7 @@ impl machine
             {
                 let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
                 self.keyboardQueue.pop();
-                pcpu.ax=(pcpu.ax&0xff00)|(scanCode>>8);
+                pcpu.ax=(pcpu.ax&0xff00)|((scanCode>>8)|0x00);
             }
             else
             {
@@ -160,22 +180,22 @@ impl machine
         {
             pcpu.ax=pcpu.ax&0xff00;
         }
-        else if addr16==0x3da
+        else if (addr16==0x3b5) || (addr16==0x3d5)
         {
-            // CGA status register	EGA/VGA: input status 1 register
-            // TODO
-            /*
-                bit 7-4     not used
-                bit 3 = 1   in vertical retrace
-                bit 2 = 1   light pen switch is off
-                bit 1 = 1   positive edge from light pen has set trigger
-                bit 0 = 0   do not use memory
-                = 1   memory access without interfering with display
-            */                
-            let num:u16 = rand::thread_rng().gen_range(0..256);
+            let num:u16=pvga.read0x3b5() as u16;
             pcpu.ax=(pcpu.ax&0xff00)|num;
         }
-
+        else if addr16==0x3da
+        {
+            //let num:u16 = /*pvga.read0x3da() as u16;*/rand::thread_rng().gen_range(0..256);
+            let num:u16 = pvga.read0x3da() as u16;
+            pcpu.ax=(pcpu.ax&0xff00)|num;
+        }
+        else if addr16==0x201
+        {
+            // joystick read position&status
+            // TODO
+        }
     }
 
     // returns true if we should go on with the code
@@ -227,6 +247,8 @@ impl machine
             {
                 // INT 10,11 - Character Generator Routine (EGA/VGA)
                 // TODO
+                println!("warning: int10h is trying to remap character set {:04x}",pcpu.ax);
+                //process::exit(0x0100);
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0e00
@@ -305,14 +327,18 @@ impl machine
             }
             else if (pcpu.ax&0xff00)==0x1200
             {
-                // INT 10,12 - Video Subsystem Configuration (EGA/VGA)
-                // TODO
+                // INT 10,12 - Video Subsystem Configuration (EGA/VGA only)
+                pcpu.bx=0x0003; // EGA
+                pcpu.cx=0x0009; // EGA
+                //pcpu.cx=0x0005; // CGA
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1a00
             {
-                // INT 10,1A - Video Display Combination (VGA)
-                // TODO
+                // INT 10,1A - Video Display Combination (gets display configuration)
+                pcpu.ax&=0xff1a; // EGA/VGA
+                pcpu.bx&=0xff45; // EGA/VGA
+                //pcpu.bx&=0xff02; // CGA?
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1b00
