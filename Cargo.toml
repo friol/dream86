@@ -1,10 +1,11 @@
 [package]
 name = "dream86"
-version = "0.0.5"
+version = "0.0.6"
 edition = "2021"
 
 [dependencies]
 crossterm = "*"
 minifb = "0.20"
 rand = "0.8"
+chrono = "*"
 image = "*"
