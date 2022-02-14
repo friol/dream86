@@ -1,5 +1,6 @@
 /* dream86 - machine 2o22 */
 
+use chrono::Datelike;
 use std::fs::File;
 use std::io::prelude::*;
 use rand::Rng;
@@ -198,6 +199,49 @@ impl machine
         }
     }
 
+    fn getYearHex(&self) -> u16
+    {
+        let current_date = chrono::Utc::now();
+        let mut year:u16 = current_date.year() as u16;
+        let mut yearInHex:u16=0;
+        let mut mult:u32=0x1;
+        
+        // years from 0 to 9999 are supported, sigh
+        for _i in 0..4
+        {
+            yearInHex+=(year%10)*(mult as u16);
+            year/=10;
+            mult*=0x10;
+        }
+
+        return yearInHex;
+    }
+
+    fn getMonthDayHex(&self) -> u16
+    {
+        let current_date = chrono::Utc::now();
+        let mut month:u16 = current_date.month() as u16;
+        let mut day:u16 = current_date.day() as u16;
+        let mut monthDayInHex:u16=0;
+        let mut mult:u32=0x1;
+        
+        for _i in 0..2
+        {
+            monthDayInHex+=(day%10)*(mult as u16);
+            day/=10;
+            mult*=0x10;
+        }
+
+        for _i in 0..2
+        {
+            monthDayInHex+=(month%10)*(mult as u16);
+            month/=10;
+            mult*=0x10;
+        }
+
+        return monthDayInHex;
+    }
+
     // returns true if we should go on with the code
     pub fn handleINT(&mut self,intNum:u8,pcpu:&mut x86cpu,pvga:&mut vga,pdisk:&fddController) -> bool
     {
@@ -233,8 +277,9 @@ impl machine
                 // CX = count of characters to write (CX >= 1)                
                 let al=pcpu.ax&0xff;
                 let bl=pcpu.bx&0xff;
+                let bh=pcpu.bx>>8;
                 let cx=pcpu.cx;
-                pvga.writeCharsWithAttribute(al,bl,cx);
+                pvga.writeCharsWithAttribute(al,bh,bl,cx);
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0800
@@ -247,7 +292,7 @@ impl machine
             {
                 // INT 10,11 - Character Generator Routine (EGA/VGA)
                 // TODO
-                println!("warning: int10h is trying to remap character set {:04x}",pcpu.ax);
+                //println!("warning: int10h is trying to remap character set {:04x}",pcpu.ax);
                 //process::exit(0x0100);
                 return true;
             }
@@ -649,9 +694,8 @@ impl machine
             else if (pcpu.ax&0xff00)==0x0400
             {
                 // INT 1A,4 - Read Real Time Clock Date (XT 286,AT,PS/2)
-                // TODO
-                pcpu.cx=0x2022; // 2022 forevah
-                pcpu.dx=0x0119; 
+                pcpu.cx=self.getYearHex();
+                pcpu.dx=self.getMonthDayHex();
                 pcpu.setCflag(false); // CF = 0 if successful
                 return true;
             }
@@ -759,17 +803,6 @@ impl machine
                 println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
             }
-        }
-        else if intNum==0x24
-        {
-            // do nothing for now
-            return true;
-        }
-        else if intNum==0x33
-        {
-            // mouse function calls
-            // TODO
-            return true;
         }
         else
         {

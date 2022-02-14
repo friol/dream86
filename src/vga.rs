@@ -35,6 +35,9 @@ impl vga
 {
     pub fn setVideomode(&mut self,videomodeNum:u16)
     {
+        self.cursorx=0;
+        self.cursory=0;
+
         if videomodeNum==0x13
         {
             // VGA 320x200
@@ -85,6 +88,15 @@ impl vga
         {
             // EGA 320x200x16
             self.mode=0x0d;
+            for idx in 0..self.framebuffer.len()
+            {
+                self.framebuffer[idx]=0;
+            }
+        }
+        else if videomodeNum==0x10
+        {
+            // EGA 640x350x16
+            self.mode=0x10;
             for idx in 0..self.framebuffer.len()
             {
                 self.framebuffer[idx]=0;
@@ -166,15 +178,15 @@ impl vga
     {
         if (addr>=0xa0000) && (addr<=0xaffff)
         {
-            // if ega videomode is 0x0d and write mode is 0
-            if (self.mode==0x0d) && (self.egaRegister3cfValues[5]==0)
+            // if ega videomode is 0x0d|0x10 and write mode is 0
+            if ((self.mode==0x0d)||(self.mode==0x10)) && (self.egaRegister3cfValues[5]==0)
             {
                 let mut realVal=val;
                 let bitplane=self.egaRegister3c5Values[2];
                 let reg3_ega3cf=self.egaRegister3cfValues[3];
                 let reg8_ega3cf=self.egaRegister3cfValues[8];
 
-                let latchNum=(addr-0xa0000)>>13;
+                let latchNum=((addr-0xa0000)>>13)&0x03;
 
                 // data rotate reg bits 3&4: 
                 if (reg3_ega3cf&0x18)==0x18
@@ -217,7 +229,7 @@ impl vga
                     self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=realVal;
                 }
             }
-            else if (self.mode==0x0d) && (self.egaRegister3cfValues[5]==2)
+            else if ((self.mode==0x0d)||(self.mode==0x10)) && (self.egaRegister3cfValues[5]==2)
             {
                 let bitplane=0xff;//self.egaRegister3c5Values[2];
                 let reg8_ega3cf=self.egaRegister3cfValues[8];
@@ -304,10 +316,19 @@ impl vga
         return ch|(attr<<8);
     }
 
-    pub fn writeCharsWithAttribute(&mut self,ochar:u16,attrib:u16,nchars:u16)
+    pub fn writeCharsWithAttribute(&mut self,ochar:u16,bgcol:u16,attrib:u16,nchars:u16)
     {
         // if in textmode
-        if (self.mode==2) || (self.mode==3)
+        if (self.mode==0) || (self.mode==1)
+        {
+            let numColumns=40;
+            for _i in 0..nchars
+            {
+                self.cgaFramebuffer[((self.cursorx+_i as usize)*2)+(self.cursory*numColumns*2)]=ochar as u8;
+                self.cgaFramebuffer[((self.cursorx+_i as usize)*2)+(self.cursory*numColumns*2)+1]=attrib as u8;
+            }
+        }
+        else if (self.mode==2) || (self.mode==3)
         {
             let numColumns=80;
             for _i in 0..nchars
@@ -316,9 +337,10 @@ impl vga
                 self.cgaFramebuffer[((self.cursorx+_i as usize)*2)+(self.cursory*numColumns*2)+1]=attrib as u8;
             }
         }
-        else if (self.mode==4) || (self.mode==5)
+        else if (self.mode==4) || (self.mode==5) || (self.mode==0x0d)
         {
             // CGA 320x200 modes
+            // EGA 320x200 mode
             let mut tempFb:Vec<u32>=Vec::new();
 
             self.drawCharOnScreen(&mut tempFb,
@@ -328,17 +350,22 @@ impl vga
                 self.cursory as u32,
                 self.cursorx as u32,
                 320,
-                1,0);
+                attrib as u32,bgcol as u32);
         }
     }
 
     pub fn outputCharToStdout(&mut self,ochar:u8)
     {
         // if in textmode
-        if (self.mode==2) || (self.mode==3)
+        if (self.mode==0) || (self.mode==1) || (self.mode==2) || (self.mode==3)
         {
             let charCol=7;
-            let numColumns=80;
+            let mut numColumns=80;
+            if (self.mode==0) || (self.mode==1) 
+            {
+                numColumns=40;
+            }
+
             if ochar==13
             {
                 self.cgaFramebuffer[(self.cursorx*2)+(self.cursory*numColumns*2)]=0;
@@ -379,6 +406,9 @@ impl vga
 
     fn putCGA320x200pixel(&mut self,curcol:u8,pixelx:u32,pixely:u32)
     {
+        if pixelx>=320 { return };
+        if pixely>=200 { return };
+
         let mut adder=0;
         if (pixely%2)>0 { adder=0x2000; }
 
@@ -389,6 +419,28 @@ impl vga
         let maskArr=[0xfc,0xf3,0xcf,0x3f];
         self.cgaFramebuffer[(adder+curbyte+(curline*80)) as usize]&=maskArr[cur2bits as usize];
         self.cgaFramebuffer[(adder+curbyte+(curline*80)) as usize]|=(curcol&0x03)<<(cur2bits*2);
+    }
+
+    fn putEGA320x200pixel(&mut self,curcol:u8,pixelx:u32,pixely:u32)
+    {
+        if pixelx>=320 { return };
+        if pixely>=200 { return };
+
+        let curbyte=(pixelx/8)%40;
+        let curbit=7-(pixelx%8);
+        let curline=pixely;
+
+        self.framebuffer[(curbyte+(curline*40)) as usize]&=!(1<<curbit);
+        self.framebuffer[(curbyte+(curline*40)) as usize]|=(curcol&0x1)<<curbit;
+
+        self.framebuffer[(0x2000+curbyte+(curline*40)) as usize]&=!(1<<curbit);
+        self.framebuffer[(0x2000+curbyte+(curline*40)) as usize]|=((curcol&0x2)>>1)<<curbit;
+
+        self.framebuffer[(0x4000+curbyte+(curline*40)) as usize]&=!(1<<curbit);
+        self.framebuffer[(0x4000+curbyte+(curline*40)) as usize]|=((curcol&0x4)>>2)<<curbit;
+
+        self.framebuffer[(0x6000+curbyte+(curline*40)) as usize]&=!(1<<curbit);
+        self.framebuffer[(0x6000+curbyte+(curline*40)) as usize]|=((curcol&0x8)>>3)<<curbit;
     }
 
     fn drawCharOnScreen(&mut self,
@@ -444,6 +496,27 @@ impl vga
                 srcx=(charNum%numCharsPerRow)*charDimX;
             }
 
+        }
+        else if self.mode==0x0d
+        {
+            for _y in 0..charDimY
+            {
+                for _x in 0..charDimX
+                {
+                    let curVal=self.font8x8data[srcy as usize][srcx as usize];
+                    if curVal!=0
+                    {
+                        self.putEGA320x200pixel(14 as u8,dstx,dsty);
+                    }
+                    dstx+=1;
+                    srcx+=1;
+                }
+                dstx=col*charDimX;
+                dsty+=1;
+
+                srcy+=1;
+                srcx=(charNum%numCharsPerRow)*charDimX;
+            }
         }
     }
 
@@ -563,7 +636,17 @@ impl vga
 
     pub fn write0x3b5(&mut self,val:u8)
     {
-        self.egaRegister3b5Values[self.egaRegister3b4Selected as usize]=val;
+        let mut newVal=val;
+        if (self.egaRegister3b4Selected & 0x20)>0 { return; }
+
+        if (self.egaRegister3b4Selected < 7) && ((self.egaRegister3b5Values[0x11] & 0x80)>0) { return; }
+
+        if (self.egaRegister3b4Selected == 7) && ((self.egaRegister3b5Values[0x11] & 0x80)>0)
+        {
+            newVal = (self.egaRegister3b5Values[7] & !0x10) | (val & 0x10);        
+        }
+
+        self.egaRegister3b5Values[self.egaRegister3b4Selected as usize]=newVal;
     }
 
     pub fn read0x3b5(&self) -> u8
@@ -609,10 +692,10 @@ impl vga
             // mode 0,1 - 40x25 text mode, 9x16 chars, 360x400
             // mode 2 - 80x25 text mode, 9x16 chars, 720x400
 
-            let mut resx=720; let mut resy=400; let mut rows=80; let mut cols=25;
+            let mut resx=720; let mut resy=400; let mut cols=80; let mut rows=25;
             if (self.mode==0x00) || (self.mode==0x01)
             { 
-                resx=360; resy=400; rows=40; cols=25; 
+                resx=360; resy=400; cols=40; rows=25; 
             }
 
             let mut idx:usize=0;
@@ -633,8 +716,8 @@ impl vga
                     9,16,
                     32,
                     charNum as u32,
-                    i/rows,
-                    i%rows,
+                    i/cols,
+                    i%cols,
                     resx,
                     self.vgaPalette[fgCol as usize],self.vgaPalette[bgCol as usize]);
                 bufIdx+=2;
@@ -647,9 +730,10 @@ impl vga
                 idx+=1;
             }        
         }
-        else if self.mode==0x0d
+        else if (self.mode==0x0d) || (self.mode==0x10)
         {
             // EGA 320x200x16
+            // EGA 640x350x16
             let mut idx:usize=0;
             let mut curbit=7;
             
@@ -891,7 +975,7 @@ impl vga
 
         let reg3c5Values=Vec::from([0,0,0,0,0]); // 5 registers
         let reg3cfValues=Vec::from([0,0,0,0,0,0,0,0,0]); // 9 registers
-        let reg3b5Values=Vec::from([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]); // 18 registers
+        let reg3b5Values=Vec::from([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]); // 64 registers for vga
         let latches=Vec::from([0,0,0,0]);
 
         vga

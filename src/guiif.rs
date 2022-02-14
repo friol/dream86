@@ -93,6 +93,7 @@ impl guiif
         else if videomode==0x05 { vwidth=320; vheight=200; }
         else if videomode==0x06 { vwidth=640; vheight=200; }
         else if videomode==0x0d { vwidth=320; vheight=200; }
+        else if videomode==0x10 { vwidth=640; vheight=350; }
 
         if videomode==0x13 || videomode==0x04  || videomode==0x05 || videomode==0x0d || videomode==0x06
         {

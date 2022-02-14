@@ -18,6 +18,7 @@ use std::env;
 use std::time::Instant;
 
 mod vga;
+mod pic8259;
 mod machine;
 mod x86cpu;
 mod fddController;
@@ -53,7 +54,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&mut theVGA,&theMachine,0x2881,0x68a0,80);
+        theGUI.drawMemory(&mut theVGA,&theMachine,0x28ce,0x2e9e,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -171,12 +172,15 @@ fn main()
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x4110)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x413a)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
-                //if (theCPU.cs==0xdfb) && (theCPU.ip==0x0) // av.exe 
-                //if (theCPU.cs==0xdfb) && (theCPU.ip==0x49f6) // av.exe 
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
                 //if (theCPU.cs==0x0e88) && (theCPU.ip==0x02ed)
-                //if (theCPU.cs==0x050) && (theCPU.ip==0x7b16)
-                if false
+                //if (theCPU.cs==0xe00) && (theCPU.ip==0x4c7)
+                //if (theCPU.cs==0xe00) && (theCPU.ip==0x3ff)
+                //if (theCPU.cs==0x1301) && (theCPU.ip==0x36ea)
+                //if (theCPU.cs==0x24ac) && (theCPU.ip==0x2c6)
+                if (theCPU.cs==0x24ac) && (theCPU.ip==0x11a9)
+                //if (theCPU.cs==0x24ac) && (theCPU.ip==0x340)
+                //if false
                 {
                     bailOut=true;
                 }

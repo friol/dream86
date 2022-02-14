@@ -119,6 +119,7 @@ pub enum instructionType
     instrDas,
     instrDaa,
     instrAaa,
+    instrSalc,
     instrFninit,
     instrFnstsw,
 }
@@ -406,6 +407,13 @@ impl x86cpu
             { 
                 let mut offs32:i32=self.bx as i32;
                 offs32+=self.di as i32;
+                offs32&=0xffff;
+                dst=offs32 as u16;
+            }
+            else if operand1=="[BX+SI]" 
+            { 
+                let mut offs32:i32=self.bx as i32;
+                offs32+=self.si as i32;
                 offs32&=0xffff;
                 dst=offs32 as u16;
             }
@@ -1302,6 +1310,11 @@ impl x86cpu
             destAddr=pmachine.readMemory16(readSeg,self.bx+self.si+self.decInstr.displacement as u16,pvga);
             destSeg=pmachine.readMemory16(readSeg,self.bx+self.si+2+self.decInstr.displacement as u16,pvga);
         }
+        else if operand1.contains("[BX+DI+Disp]")
+        {
+            destAddr=pmachine.readMemory16(readSeg,self.bx+self.di+self.decInstr.displacement as u16,pvga);
+            destSeg=pmachine.readMemory16(readSeg,self.bx+self.di+2+self.decInstr.displacement as u16,pvga);
+        }
         else if operand1.contains("[BP+Disp]")
         {
             let mut readSeg:u16=self.ss;
@@ -1432,14 +1445,9 @@ impl x86cpu
 
     fn performStos(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        if self.decInstr.repPrefix=="REPNE"
-        {
-            self.abort("Unhandled REPNE stos");
-        }
-
         if self.decInstr.instrSize==16
         {
-            if self.decInstr.repPrefix=="REPE"
+            if (self.decInstr.repPrefix=="REPE") || (self.decInstr.repPrefix=="REPNE")
             {
                 if self.cx!=0
                 {
@@ -1463,7 +1471,7 @@ impl x86cpu
         }
         else if self.decInstr.instrSize==8
         {
-            if self.decInstr.repPrefix=="REPE"
+            if (self.decInstr.repPrefix=="REPE") || (self.decInstr.repPrefix=="REPNE")
             {
                 if self.cx!=0
                 {
@@ -3063,6 +3071,7 @@ impl x86cpu
         else if it=="Das" { return instructionType::instrDas; }
         else if it=="Daa" { return instructionType::instrDaa; }
         else if it=="Aaa" { return instructionType::instrAaa; }
+        else if it=="Salc" { return instructionType::instrSalc; }
         else if it=="Fninit" { return instructionType::instrFninit; }
         else if it=="Fnstsw" { return instructionType::instrFnstsw; }
         else if it=="SbbNMRR" { return instructionType::instrSbbNoModRegRm; }
@@ -3185,6 +3194,7 @@ impl x86cpu
             0xE3 => { return ["JCXZ","8","1","r0","","JmpShort","0"]; }
             0xEB => { return ["JMP Short","8","1","r0","","JmpShort","0"]; }
             // INT nn
+            0xcc => { return ["INT3","8","0","","","Nop","0"]; }
             0xcd => { return ["INT","8","1","intnum","","Int","0"]; }
             // CALL 16bit relative offset
             0xe8 => { return ["CALL","16","1","r0","","CallRel16","0"]; }
@@ -3322,6 +3332,8 @@ impl x86cpu
             0x9f => { return ["LAHF","8","0","","","Lahf","0"]; }
             // SAHF
             0x9e => { return ["SAHF","8","0","","","Sahf","0"]; }
+            // SALC
+            0xd6 => { return ["SALC","8","0","","","Salc","0"]; }
 
             0xd4 => { return ["AAM","8","1","ib","","Aam","0"]; }
             0xd5 => { return ["AAD","16","0","","","Aad","0"]; }
@@ -4097,7 +4109,6 @@ impl x86cpu
             // INT nn
             let intNum=self.decInstr.operand1.parse::<u8>().unwrap();
 
-            //if (intNum==0x1c) || (intNum==0x21) || (intNum==0x2a) || (intNum==0x2f) || (intNum==0x20) || (intNum==0x28) || (intNum==0x3f) || (intNum==131)
             if (intNum>=0x1c) || intNum==0x08 || intNum==0x18 || intNum==0x19
             {
                 let newip=pmachine.readMemory16(0x0,(intNum as u16)*4,pvga);
@@ -4126,15 +4137,21 @@ impl x86cpu
         }
         else if self.decInstr.insType==instructionType::instrJmpNp
         {
+            if self.decInstr.segOverride!=""
+            {
+                self.abort(&format!("Warning: segment override in jump at {:04x}:{:04x}",self.cs,self.ip));
+            }
+
             self.ip=self.ip.wrapping_add((self.decInstr.u16immediate+3) as u16);
         }
         else if self.decInstr.insType==instructionType::instrCallRel16
         {
             // call with 16 bit relative offset
+            let prefixAdder=if self.decInstr.segOverride!="" { 1 } else { 0 };
             let offset16=self.decInstr.operand1.parse::<u16>().unwrap();
-            pmachine.push16(self.ip+3,self.ss,self.sp);
+            pmachine.push16(self.ip+3+prefixAdder,self.ss,self.sp);
             self.sp-=2;
-            self.ip=self.ip.wrapping_add((offset16+3) as u16);
+            self.ip=self.ip.wrapping_add((offset16+3+prefixAdder) as u16);
         }
         else if self.decInstr.insType==instructionType::instrCallReg
         {
@@ -4198,7 +4215,7 @@ impl x86cpu
             }
             else if self.decInstr.operand1=="Direct Addr"
             {
-                offs=pmachine.readMemory16(readSeg,self.ip+2+soadder,pvga);
+                offs=pmachine.readMemory16(self.cs,self.ip+2+soadder,pvga);
             }
             else
             {
@@ -4519,6 +4536,19 @@ impl x86cpu
         else if self.decInstr.insType==instructionType::instrNop
         {
             // do absolutely nothing
+            self.ip+=self.decInstr.insLen as u16;
+        }
+        else if self.decInstr.insType==instructionType::instrSalc
+        {
+            if self.getCflag()
+            {
+                self.ax=(self.ax&0xff00)|0xff;
+            }
+            else
+            {
+                self.ax=self.ax&0xff00;
+            }
+
             self.ip+=self.decInstr.insLen as u16;
         }
         else if self.decInstr.insType==instructionType::instrFninit
