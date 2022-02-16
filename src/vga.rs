@@ -3,6 +3,7 @@
 use std::process;
 
 use crate::guiif::guiif;
+use crate::machine::machine;
 
 pub struct vga
 {
@@ -316,7 +317,7 @@ impl vga
         return ch|(attr<<8);
     }
 
-    pub fn writeCharsWithAttribute(&mut self,ochar:u16,bgcol:u16,attrib:u16,nchars:u16)
+    pub fn writeCharsWithAttribute(&mut self,ochar:u16,bgcol:u16,attrib:u16,nchars:u16,seg:u16,offs:u16,pmachine:&machine)
     {
         // if in textmode
         if (self.mode==0) || (self.mode==1)
@@ -342,15 +343,26 @@ impl vga
             // CGA 320x200 modes
             // EGA 320x200 mode
             let mut tempFb:Vec<u32>=Vec::new();
+            let mut tempChar:Vec<u8>=Vec::new();
+            for _py in 0..8
+            {
+                let curb=pmachine.readMemory(seg,offs+_py,self);
+                for _b in 0..8
+                {
+                    let valz=if curb&(1<<(7-_b))>0 { 1 } else { 0 };
+                    tempChar.push(valz);
+                }
+            }
 
             self.drawCharOnScreen(&mut tempFb,
                 8,8,
                 32,
-                (ochar&0x7f) as u32,
+                ochar as u32,
                 self.cursory as u32,
                 self.cursorx as u32,
                 320,
-                attrib as u32,bgcol as u32);
+                attrib as u32,bgcol as u32,
+                tempChar);
         }
     }
 
@@ -451,7 +463,8 @@ impl vga
         charNum:u32,
         row:u32,col:u32,
         scrInc:u32,
-        fgCol:u32,bgCol:u32)
+        fgCol:u32,bgCol:u32,
+        charVec:Vec<u8>)
     {
         let mut srcx:u32=(charNum%numCharsPerRow)*charDimX;
         let mut srcy:u32=(charNum/numCharsPerRow)*charDimY;
@@ -499,17 +512,28 @@ impl vga
         }
         else if self.mode==0x0d
         {
+            let mut pos=0;
             for _y in 0..charDimY
             {
                 for _x in 0..charDimX
                 {
-                    let curVal=self.font8x8data[srcy as usize][srcx as usize];
-                    if curVal!=0
+                    let curVal:u32;
+                    
+                    // tricky int 10h,9 behaviour
+                    // btw, leisure suit larry I changes on the fly the character pointed by char 0x00 at int vec 0x1f
+                    if charNum<0x80
                     {
-                        self.putEGA320x200pixel(14 as u8,dstx,dsty);
+                        curVal=self.font8x8data[srcy as usize][srcx as usize];
                     }
+                    else
+                    {
+                        curVal=charVec[pos] as u32;
+                    }
+                    let col=if curVal>0 { fgCol } else { bgCol };
+                    self.putEGA320x200pixel(col as u8,dstx,dsty);
                     dstx+=1;
                     srcx+=1;
+                    pos+=1;
                 }
                 dstx=col*charDimX;
                 dsty+=1;
@@ -712,6 +736,7 @@ impl vga
                 let fgCol=attributes&0x0f;
                 let bgCol=(attributes>>4)&0x07;
                 let charNum:u8=self.cgaFramebuffer[bufIdx];
+                let tempVec:Vec<u8>=Vec::new();
                 self.drawCharOnScreen(&mut tempFb,
                     9,16,
                     32,
@@ -719,7 +744,7 @@ impl vga
                     i/cols,
                     i%cols,
                     resx,
-                    self.vgaPalette[fgCol as usize],self.vgaPalette[bgCol as usize]);
+                    self.vgaPalette[fgCol as usize],self.vgaPalette[bgCol as usize],tempVec);
                 bufIdx+=2;
             }
 

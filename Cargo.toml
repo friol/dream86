@@ -9,3 +9,6 @@ minifb = "0.20"
 rand = "0.8"
 chrono = "*"
 image = "*"
+
+[profile.release]
+debug = true

@@ -16,7 +16,9 @@ pub struct machine
     pub stackey: Vec<u8>,
     pub internalClockTicker: u64,
     pub clockTicker: u64,
-    pub keyboardQueue: Vec<u16>
+    pub keyboardQueue: Vec<u16>,
+    pub lastScancode: u16,
+    pub ppi_a: u8
 }
 
 impl machine 
@@ -88,7 +90,10 @@ impl machine
 
     pub fn addKeystroke(&mut self,ks:u16)
     {
-        self.keyboardQueue.push(ks);
+        if !self.keyboardQueue.contains(&ks)
+        {
+            self.keyboardQueue.push(ks);
+        }
     }
 
     pub fn handleOut(&mut self,pvga:&mut vga,addr8:u8,addr16:u16,val:u8)
@@ -143,6 +148,18 @@ impl machine
             // MDA CRT data register	 (EGA/VGA)
             pvga.write0x3b5(val);            
         }
+        else if (addr8==0x61) || (addr16==0x61)
+        {
+            if ((self.ppi_a & 0x80) != 0) && ((val & 0x80) == 0)
+            {
+                if self.keyboardQueue.len()!=0
+                {
+                    self.keyboardQueue.pop();
+                }
+            }
+    
+            self.ppi_a = val;            
+        }
         else if (addr8==0x64) || (addr16==0x64)
         {
             println!("Out to port 0x64");
@@ -163,14 +180,15 @@ impl machine
             let num:u16=(0xff-(self.clockTicker&0xff)) as u16;
             pcpu.ax=(pcpu.ax&0xff00)|num;
         }
-        else if addr8==0x60
+        else if (addr8==0x60) || (addr16==0x60)
         {
             // read key pressed
             if self.keyboardQueue.len()>0
             {
                 let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
-                self.keyboardQueue.pop();
+                //self.keyboardQueue.pop();
                 pcpu.ax=(pcpu.ax&0xff00)|((scanCode>>8)|0x00);
+                self.lastScancode=scanCode>>8;
             }
             else
             {
@@ -179,7 +197,7 @@ impl machine
         }
         else if addr8==0x61
         {
-            pcpu.ax=pcpu.ax&0xff00;
+            pcpu.ax=(pcpu.ax&0xff00)|(self.ppi_a as u16);
         }
         else if (addr16==0x3b5) || (addr16==0x3d5)
         {
@@ -279,7 +297,11 @@ impl machine
                 let bl=pcpu.bx&0xff;
                 let bh=pcpu.bx>>8;
                 let cx=pcpu.cx;
-                pvga.writeCharsWithAttribute(al,bh,bl,cx);
+
+                let ip1f=self.readMemory16(0x0,(0x1f)*4,pvga);
+                let cs1f=self.readMemory16(0x0,((0x1f)*4)+2,pvga);
+
+                pvga.writeCharsWithAttribute(al,bh,bl,cx,cs1f,ip1f,self);
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0800
@@ -346,6 +368,8 @@ impl machine
             else if (pcpu.ax&0xff00)==0x0200
             {
                 // INT 10,2 - Set Cursor Position
+                // DH = row
+                // DL = column
                 pvga.setCursorPosition(pcpu.dx&0xff,pcpu.dx>>8);
                 return true;
             }
@@ -356,6 +380,7 @@ impl machine
 	            // DL = column
                 let cp=pvga.getCursorPosition();
                 pcpu.dx=(cp.0 as u16)|((cp.1 as u16)<<8);
+                pcpu.cx=0x0607; // TODO, I don't think it's the same for all videomodes
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0500
@@ -607,6 +632,23 @@ impl machine
                 pcpu.setCflag(true);
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x1500
+            {
+                // INT 15,4f - Keyboard Intercept (BIOS date specific)
+                if self.lastScancode!=0
+                {
+                    pcpu.ax=(pcpu.ax&0xff00)|(self.lastScancode);
+                    pcpu.setCflag(true);
+                    self.lastScancode=0;
+                }
+                else
+                {
+                    pcpu.ax=pcpu.ax&0xff00;
+                    pcpu.setCflag(false);
+                }
+    
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x8600
             {
                 // INT 15,86 - Elapsed Time Wait (AT and PS/2)
@@ -631,14 +673,12 @@ impl machine
                 //pcpu.setCflag(true);
                 return true;
             }
-            /*else
+            else
             {
-                println!("Unknown interrupt");
+                println!("Unknown interrupt 0x15");
                 println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
                 process::exit(0x0100);
-            }*/
-
-            return true;
+            }
         }
         else if intNum==0x17
         {
@@ -732,7 +772,6 @@ impl machine
                 {
                     let scanCode:u16=self.keyboardQueue[self.keyboardQueue.len()-1];
                     self.keyboardQueue.pop();
-                    //pcpu.ax=((scanCode as u16)<<8)|(scanCode as u16);
                     pcpu.ax=scanCode;
                     return true;
                 }
@@ -957,7 +996,9 @@ impl machine
             stackey: thestack,
             internalClockTicker: 0,
             clockTicker: 0,
-            keyboardQueue: kq
+            keyboardQueue: kq,
+            lastScancode: 0,
+            ppi_a: 0
         }
     }
 }

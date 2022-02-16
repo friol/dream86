@@ -178,31 +178,15 @@ fn main()
                 //if (theCPU.cs==0xe00) && (theCPU.ip==0x3ff)
                 //if (theCPU.cs==0x1301) && (theCPU.ip==0x36ea)
                 //if (theCPU.cs==0x24ac) && (theCPU.ip==0x2c6)
-                if (theCPU.cs==0x24ac) && (theCPU.ip==0x11a9)
+                //if (theCPU.cs==0x24ac) && (theCPU.ip==0x11a9)
                 //if (theCPU.cs==0x24ac) && (theCPU.ip==0x340)
-                //if false
+                //if (theCPU.cs==0x1a79) && (theCPU.ip==0x00d7)
+                //if (theCPU.cs==0x0c3a) && (theCPU.ip==0x138)
+                //if (theCPU.cs==0xec9) && (theCPU.ip==0x2A14)
+                if false
                 {
                     bailOut=true;
                 }
-
-                //if dbgstr.contains(" (23)")
-                //{
-                    /*if 
-                        (!dbgstr.contains("AH,AH")) &&
-                        (!dbgstr.contains("BH,BH")) &&
-                        (!dbgstr.contains("CH,CH")) &&
-                        (!dbgstr.contains("DH,DH")) &&
-                        (!dbgstr.contains("AX,AX")) &&
-                        (!dbgstr.contains("BX,BX")) &&
-                        (!dbgstr.contains("CX,CX")) &&
-                        (!dbgstr.contains("BP,BP")) &&
-                        (!dbgstr.contains("SI,SI")) &&
-                        (!dbgstr.contains("DI,DI")) &&
-                        (!dbgstr.contains("DX,DX"))*/
-                  /*  {
-                        bailOut=true;
-                    }*/
-                //}
 
                 if inum>2000
                 {

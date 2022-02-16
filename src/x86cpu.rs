@@ -1957,7 +1957,7 @@ impl x86cpu
             else if self.decInstr.segOverride=="DS" { readSeg=self.ds; }
             else if self.decInstr.segOverride=="ES" { readSeg=self.es; }
     
-            let offset16=self.bp+self.decInstr.displacement as u16;
+            let offset16:u16=self.bp.wrapping_add(self.decInstr.displacement as u16);
             adr=pmachine.readMemory16(readSeg,offset16,pvga);
             seg=pmachine.readMemory16(readSeg,offset16+2,pvga);
         }
@@ -4849,6 +4849,11 @@ impl x86cpu
 
             let newip=pmachine.readMemory16(0x0,(self.intPendingNum as u16)*4,pvga);
             let newcs=pmachine.readMemory16(0x0,((self.intPendingNum as u16)*4)+2,pvga);
+
+            /*if self.intPendingNum==9
+            {
+                self.abort(&format!("kbd irq vs {:04x}:{:04x}",newcs,newip));
+            }*/
 
             pmachine.push16(self.flags,self.ss,self.sp);
             self.sp-=2;
