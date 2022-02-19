@@ -9,13 +9,10 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use std::process;
-//use std::{thread, time};
-//use std::fs::File;
-//use std::io::prelude::*;
-
 use std::env;
 use std::time::Instant;
+use std::process;
+
 
 mod vga;
 mod pic8259;
@@ -24,10 +21,14 @@ mod x86cpu;
 mod fddController;
 mod guiif;
 
+//
+//
+//
+
 fn main()
 {
     let mut _breakIt=false;
-    
+
     let args: Vec<String> = env::args().collect();
     if args.len()!=4
     {
@@ -41,8 +42,9 @@ fn main()
 
     //
 
+    let _thePIC=pic8259::pic8259::new();
     let mut theVGA=vga::vga::new("./fonts/9x16.png","./fonts/cga8.png");
-    let mut theMachine=machine::machine::new(&comName,0x100000,runMode);
+    let mut theMachine=machine::machine::new(&comName,0x100000,runMode,machine::machineType::machineCGA);
     let theDisk=fddController::fddController::new(diskImageName);
     let mut theCPU=x86cpu::x86cpu::new(runMode);
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
@@ -162,6 +164,7 @@ fn main()
             let mut bailOut=false;
             while !bailOut
             {
+                //profile_method!(theCPU.executeOne);
                 let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update(&mut theCPU);
                 theVGA.update();
@@ -214,3 +217,4 @@ fn main()
         }
     }
 }
+

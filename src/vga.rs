@@ -135,10 +135,7 @@ impl vga
     {
         if self.mode==0x04 || self.mode==0x05
         {
-            let mut addr=(row/640)+(column/4);
-            if (row%2)>0 { addr+=0x2000; }
-            let bit2=(column%4)*2;
-            self.cgaFramebuffer[addr as usize]=self.cgaFramebuffer[addr as usize]&((color&0x3)<<(6-bit2));
+            self.putCGA320x200pixel(color,column as u32,row as u32);
         }
         else
         {
@@ -179,6 +176,12 @@ impl vga
     {
         if (addr>=0xa0000) && (addr<=0xaffff)
         {
+            let mut planeSize=0x2000;
+            if self.mode==0x10
+            {
+                planeSize=0x8000;
+            }
+
             // if ega videomode is 0x0d|0x10 and write mode is 0
             if ((self.mode==0x0d)||(self.mode==0x10)) && (self.egaRegister3cfValues[5]==0)
             {
@@ -219,15 +222,15 @@ impl vga
                 }
                 if (bitplane&0x02)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x2000)&0xffff) as usize]=realVal;
+                    self.framebuffer[((addr-0xa0000+planeSize)&0xffff) as usize]=realVal;
                 }
                 if (bitplane&0x04)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x4000)&0xffff) as usize]=realVal;
+                    self.framebuffer[((addr-0xa0000+(planeSize*2))&0xffff) as usize]=realVal;
                 }
                 if (bitplane&0x08)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=realVal;
+                    self.framebuffer[((addr-0xa0000+(planeSize*3))&0xffff) as usize]=realVal;
                 }
             }
             else if ((self.mode==0x0d)||(self.mode==0x10)) && (self.egaRegister3cfValues[5]==2)
@@ -246,15 +249,15 @@ impl vga
                 }
                 if (bitplane&0x02)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x2000)&0xffff) as usize]=(valb & reg8_ega3cf) | (self.egaDataLatch[1] & (!reg8_ega3cf));
+                    self.framebuffer[((addr-0xa0000+planeSize)&0xffff) as usize]=(valb & reg8_ega3cf) | (self.egaDataLatch[1] & (!reg8_ega3cf));
                 }
                 if (bitplane&0x04)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x4000)&0xffff) as usize]=(valc & reg8_ega3cf) | (self.egaDataLatch[2] & (!reg8_ega3cf));
+                    self.framebuffer[((addr-0xa0000+(planeSize*2))&0xffff) as usize]=(valc & reg8_ega3cf) | (self.egaDataLatch[2] & (!reg8_ega3cf));
                 }
                 if (bitplane&0x08)>0
                 {
-                    self.framebuffer[((addr-0xa0000+0x6000)&0xffff) as usize]=(vald & reg8_ega3cf) | (self.egaDataLatch[3] & (!reg8_ega3cf));
+                    self.framebuffer[((addr-0xa0000+(planeSize*3))&0xffff) as usize]=(vald & reg8_ega3cf) | (self.egaDataLatch[3] & (!reg8_ega3cf));
                 }
             }
             else
@@ -344,25 +347,32 @@ impl vga
             // EGA 320x200 mode
             let mut tempFb:Vec<u32>=Vec::new();
             let mut tempChar:Vec<u8>=Vec::new();
-            for _py in 0..8
+
+            if ochar>=0x80
             {
-                let curb=pmachine.readMemory(seg,offs+_py,self);
-                for _b in 0..8
+                for _py in 0..8
                 {
-                    let valz=if curb&(1<<(7-_b))>0 { 1 } else { 0 };
-                    tempChar.push(valz);
+                    let curb=pmachine.readMemory(seg,offs+_py+(8*(ochar-0x80)),self);
+                    for _b in 0..8
+                    {
+                        let valz=if curb&(1<<(7-_b))>0 { 1 } else { 0 };
+                        tempChar.push(valz);
+                    }
                 }
             }
 
-            self.drawCharOnScreen(&mut tempFb,
-                8,8,
-                32,
-                ochar as u32,
-                self.cursory as u32,
-                self.cursorx as u32,
-                320,
-                attrib as u32,bgcol as u32,
-                tempChar);
+            for _i in 0..nchars
+            {
+                self.drawCharOnScreen(&mut tempFb,
+                    8,8,
+                    32,
+                    ochar as u32,
+                    self.cursory as u32,
+                    ((self.cursorx+(_i as usize))%40) as u32,
+                    320,
+                    attrib as u32,bgcol as u32,
+                    tempChar.clone());
+            }
         }
     }
 
@@ -492,15 +502,25 @@ impl vga
         }
         else if (self.mode==0x04) || (self.mode==0x05)
         {
+            let mut pos=0;
             for _y in 0..charDimY
             {
                 for _x in 0..charDimX
                 {
-                    let curVal=self.font8x8data[srcy as usize][srcx as usize];
+                    let curVal:u32;
+                    if charNum<0x80
+                    {
+                        curVal=self.font8x8data[srcy as usize][srcx as usize];
+                    }
+                    else
+                    {
+                        curVal=charVec[pos] as u32;
+                    }
                     let curCol=if curVal==0 { bgCol } else { fgCol };
                     self.putCGA320x200pixel(curCol as u8,dstx,dsty);
                     dstx+=1;
                     srcx+=1;
+                    pos+=1;
                 }
                 dstx=col*charDimX;
                 dsty+=1;
@@ -520,7 +540,7 @@ impl vga
                     let curVal:u32;
                     
                     // tricky int 10h,9 behaviour
-                    // btw, leisure suit larry I changes on the fly the character pointed by char 0x00 at int vec 0x1f
+                    // btw, leisure suit larry 1 changes on the fly the character pointed by char 0x00 at int vec 0x1f
                     if charNum<0x80
                     {
                         curVal=self.font8x8data[srcy as usize][srcx as usize];
@@ -761,14 +781,17 @@ impl vga
             // EGA 640x350x16
             let mut idx:usize=0;
             let mut curbit=7;
+
+            let mut planeSize=0x2000;
+            if self.mode==0x10 { planeSize=0x8000; }
             
             for i in gui.frameBuffer.iter_mut() 
             {
                 {
                     let p0=(self.framebuffer[idx]&(1<<curbit))>>curbit;
-                    let p1=(self.framebuffer[idx+0x2000]&(1<<curbit))>>curbit;
-                    let p2=(self.framebuffer[idx+0x4000]&(1<<curbit))>>curbit;
-                    let p3=(self.framebuffer[idx+0x6000]&(1<<curbit))>>curbit;
+                    let p1=(self.framebuffer[idx+planeSize]&(1<<curbit))>>curbit;
+                    let p2=(self.framebuffer[idx+(planeSize*2)]&(1<<curbit))>>curbit;
+                    let p3=(self.framebuffer[idx+(planeSize*3)]&(1<<curbit))>>curbit;
 
                     let colidx=p0|(p1<<1)|(p2<<2)|(p3<<3);
 
@@ -951,7 +974,7 @@ impl vga
 
         // framebuffers
 
-        let fbSize=65536; // 64k?
+        let fbSize=65536*4; // 64k?
         let mut vgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         let mut cgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         for _i in 0..fbSize

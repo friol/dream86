@@ -10,6 +10,13 @@ use crate::vga::vga;
 use crate::x86cpu::x86cpu;
 use crate::fddController::fddController;
 
+#[derive(PartialEq)]
+pub enum machineType 
+{
+    machineCGA,
+    machineEGA,
+}
+
 pub struct machine 
 {
     pub ram: Vec<u8>,
@@ -18,7 +25,8 @@ pub struct machine
     pub clockTicker: u64,
     pub keyboardQueue: Vec<u16>,
     pub lastScancode: u16,
-    pub ppi_a: u8
+    pub ppi_a: u8,
+    pub machType: machineType
 }
 
 impl machine 
@@ -90,10 +98,7 @@ impl machine
 
     pub fn addKeystroke(&mut self,ks:u16)
     {
-        if !self.keyboardQueue.contains(&ks)
-        {
-            self.keyboardQueue.push(ks);
-        }
+        self.keyboardQueue.push(ks);
     }
 
     pub fn handleOut(&mut self,pvga:&mut vga,addr8:u8,addr16:u16,val:u8)
@@ -214,6 +219,7 @@ impl machine
         {
             // joystick read position&status
             // TODO
+            pcpu.ax=(pcpu.ax&0xff00)|0xff;
         }
     }
 
@@ -398,17 +404,31 @@ impl machine
             else if (pcpu.ax&0xff00)==0x1200
             {
                 // INT 10,12 - Video Subsystem Configuration (EGA/VGA only)
-                pcpu.bx=0x0003; // EGA
-                pcpu.cx=0x0009; // EGA
-                //pcpu.cx=0x0005; // CGA
+                if self.machType==machineType::machineEGA
+                {
+                    pcpu.bx=0x0003;
+                    pcpu.cx=0x0009;
+                }
+                else
+                {
+                    pcpu.cx=0x0005; // CGA
+                }
+                
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1a00
             {
                 // INT 10,1A - Video Display Combination (gets display configuration)
-                pcpu.ax&=0xff1a; // EGA/VGA
-                pcpu.bx&=0xff45; // EGA/VGA
-                //pcpu.bx&=0xff02; // CGA?
+                if self.machType==machineType::machineEGA
+                {
+                    pcpu.ax&=0xff1a; // EGA/VGA
+                    pcpu.bx&=0xff45; // EGA/VGA
+                }
+                else
+                {
+                    pcpu.bx&=0xff02; // CGA
+                }
+
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1b00
@@ -426,6 +446,12 @@ impl machine
             else if (pcpu.ax&0xff00)==0xef00
             {
                 // unknown, called from Qbasic
+                // TODO
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0xfa00
+            {
+                // INT 10,FA - ?
                 // TODO
                 return true;
             }
@@ -831,6 +857,11 @@ impl machine
                 // TODO: will implement it one day...
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x5500
+            {
+                // unknown
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0x9200
             {
                 // unknown
@@ -968,7 +999,7 @@ impl machine
         }
     }
 
-    pub fn new(_comFullPath:&str,ramSize:usize,mode:u8) -> Self 
+    pub fn new(_comFullPath:&str,ramSize:usize,mode:u8,machType:machineType) -> Self 
     {
         let mut machineRAM:Vec<u8>=Vec::with_capacity(ramSize);
         for _i in 0..ramSize
@@ -998,7 +1029,8 @@ impl machine
             clockTicker: 0,
             keyboardQueue: kq,
             lastScancode: 0,
-            ppi_a: 0
+            ppi_a: 0,
+            machType: machType
         }
     }
 }

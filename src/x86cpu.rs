@@ -113,6 +113,7 @@ pub enum instructionType
     instrLahf,
     instrSahf,
     instrAad,
+    instrAas,
     instrAam,
     instrSar,
     instrIdiv,
@@ -402,6 +403,10 @@ impl x86cpu
             {
                 let theAddr:i32=(self.bp as i32)+(self.di as i32)+(self.decInstr.displacement as i32);
                 dst=theAddr as u16;
+            }
+            else if operand1=="[BX]" 
+            { 
+                dst=self.bx;
             }
             else if operand1=="[BX+DI]" 
             { 
@@ -3071,6 +3076,7 @@ impl x86cpu
         else if it=="Das" { return instructionType::instrDas; }
         else if it=="Daa" { return instructionType::instrDaa; }
         else if it=="Aaa" { return instructionType::instrAaa; }
+        else if it=="Aas" { return instructionType::instrAas; }
         else if it=="Salc" { return instructionType::instrSalc; }
         else if it=="Fninit" { return instructionType::instrFninit; }
         else if it=="Fnstsw" { return instructionType::instrFnstsw; }
@@ -3340,6 +3346,7 @@ impl x86cpu
             0x27 => { return ["DAA","8","0","","","Daa","0"]; }
             0x2f => { return ["DAS","8","0","","","Das","0"]; }
             0x37 => { return ["AAA","8","0","","","Aaa","0"]; }
+            0x3f => { return ["AAS","8","0","","","Aas","0"]; }
 
             // Multi-byte instructions
             0x8000 => { return ["ADD","8","2","ib","rmb","Add","0"]; }
@@ -4531,6 +4538,28 @@ impl x86cpu
             //self.doPflag(self.ax&0xff);
             //self.doSflag(self.ax&0xff,8);
 
+            self.ip+=self.decInstr.insLen as u16;
+        }
+        else if self.decInstr.insType==instructionType::instrAas
+        {
+            let al=self.ax&0xff;
+            if ((al&0xF) > 9) || (self.getAflag()) 
+            {
+                self.ax=self.ax.wrapping_sub(6);
+                let mut ah=self.ax>>8;
+                ah=ah.wrapping_sub(1);
+                self.ax=(self.ax&0xff)|(ah<<8);
+
+                self.setAflag(true);
+                self.setCflag(true);
+			}
+			else 
+            {
+                self.setAflag(false);
+                self.setCflag(false);
+			}
+
+            self.ax=self.ax&0xff0f;
             self.ip+=self.decInstr.insLen as u16;
         }
         else if self.decInstr.insType==instructionType::instrNop
