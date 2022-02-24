@@ -449,6 +449,12 @@ impl machine
                 // TODO
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0x8000
+            {
+                // INT 10,80 - ?
+                // unknown, called from vgalemmi
+                return true;
+            }
             else if (pcpu.ax&0xff00)==0xfa00
             {
                 // INT 10,FA - ?
@@ -482,22 +488,20 @@ impl machine
             else if (pcpu.ax&0xff00)==0x0200
             {
                 // INT 13,2 - Read Disk Sectors
-                let driveNumber=pcpu.dx&0xff;
-                let numOfSectorsToRead:u64=(pcpu.ax&0x7f) as u64;
-                let sectorNumber:u64=((pcpu.cx&0x3f)-1) as u64;
 
-                //let trackNumber:u64=((((pcpu.cx>>6)&0xff)<<8)|(pcpu.cx>>8)) as u64;
-                //cylinder := ( (CX and 0xFF00) shr 8 ) or ( (CX and 0xC0) shl 2)
-                let cylinderNumber:u64=((pcpu.cx>>8)|((pcpu.cx&0xc0)<<2)) as u64;
-                
+                let driveNumber=pcpu.dx&0xff;
+                //let numOfSectorsToRead:u64=(pcpu.ax&0x7f) as u64;
+                let numOfSectorsToRead:u64=(pcpu.ax&0xff) as u64;
+                let sectorNumber:u64=((pcpu.cx&0x3f)-1) as u64;
+                let cylinderNumber:u64=((pcpu.cx>>8)+((pcpu.cx&0xc0)<<2)) as u64;
                 let headNumber:u64=(pcpu.dx>>8) as u64;
                 let loAddr=pcpu.bx;
                 let hiAddr=pcpu.es;
 
                 if driveNumber!=0
                 {
-                    println!("INT 13,2: Trying to read sectors from a drive that is not A:");
-                    process::exit(0x0100);
+                    //println!("INT 13,2: Trying to read sectors from a drive that is not A:");
+                    //process::exit(0x0100);
                     //pcpu.ax=0x0700;
                     //pcpu.setCflag(true);
                     //return true;
@@ -522,9 +526,25 @@ impl machine
                 // DL = drive number (0=A:, 1=2nd floppy, 80h=drive 0, 81h=drive 1)
                 if (pcpu.dx&0xff)==0x80
                 {
-                    // hard drive?
-                    pcpu.ax=(pcpu.ax&0xff)|(0x07<<8);
-                    pcpu.setCflag(true);
+                    // hard drive
+/*                    
+                    AH = status  (see INT 13,STATUS)
+                    BL = CMOS drive type
+                         01 - 5¬  360K	     03 - 3«  720K
+                         02 - 5¬  1.2Mb	     04 - 3« 1.44Mb
+                    CH = cylinders (0-1023 dec. see below)
+                    CL = sectors per track	(see below)
+                    DH = number of sides (0 based)
+                    DL = number of drives attached
+                    ES:DI = pointer to 11 byte Disk Base Table (DBT)
+*/                       
+                    pcpu.bx=(pcpu.bx&0xff00)|0x80;
+                    pcpu.cx=0xe87f;
+                    pcpu.dx=0x0f01;
+                    pcpu.ax=0;//pcpu.ax&0xff;
+                    pcpu.setCflag(false);
+                    //pcpu.ax=(pcpu.ax&0xff)|(0x07<<8);
+                    //pcpu.setCflag(true);
                 }
                 else if (pcpu.dx&0xff)==0
                 {
@@ -532,16 +552,19 @@ impl machine
                     // BL = CMOS drive type
                     // 01 - 5¬  360K	     03 - 3«  720K
                     // 02 - 5¬  1.2Mb	     04 - 3« 1.44Mb                    // TODO
-                    pcpu.ax=0;
+                    /*pcpu.ax=0;
                     pcpu.bx=(pcpu.bx&0xff00)|0x04; // 1.44mb diskette
                     pcpu.cx=0x4f12;
                     pcpu.dx=0x0101;
-                    pcpu.setCflag(false); // CF = 0 if successful
+                    pcpu.setCflag(false); // CF = 0 if successful*/
+                    pcpu.setCflag(true);
                 }
                 else
                 {
-                    println!("Other drive type int 13,8");
-                    process::exit(0x0100);
+                    //println!("Other drive type int 13,8");
+                    //process::exit(0x0100);
+                    pcpu.ax=(pcpu.ax&0xff)|(0x07<<8);
+                    pcpu.setCflag(true);
                 }
 
                 return true;
@@ -549,6 +572,20 @@ impl machine
             else if (pcpu.ax&0xff00)==0x0300
             {
                 // INT 13,3 - Write Disk Sectors
+                /*
+                    AL = number of sectors to write  (1-128 dec.)
+                    CH = track/cylinder number  (0-1023 dec.)
+                    CL = sector number  (1-17 dec., see below)
+                    DH = head number  (0-15 dec.)
+                    DL = drive number (0=A:, 1=2nd floppy, 80h=drive 0, 81h=drive 1)
+                    ES:BX = pointer to buffer
+
+                    on return:
+                    AH = 0 if CF=0; otherwise disk status  (see INT 13,STATUS)
+                    AL = number of sectors written
+                    CF = 0 if successful
+                    = 1 if error
+                */                
                 // TODO
                 pcpu.ax&=0xff;
                 pcpu.setCflag(false); // CF = 0 if successful
@@ -565,17 +602,19 @@ impl machine
             else if (pcpu.ax&0xff00)==0x1500
             {
                 // INT 13,15 - Read DASD Type (XT BIOS from 1/10/86 & newer)
-                assert_eq!(pcpu.dx&0xff,0); // drive a:
+                //assert_eq!(pcpu.dx&0xff,0); // drive a:
                 pcpu.ax=0x0200|(pcpu.ax&0xff);
-                pcpu.setCflag(false); // CF = 0 if successful
+                //pcpu.setCflag(false); // CF = 0 if successful
+                pcpu.setCflag(true); // CF = 0 if successful
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x1600
             {
                 // INT 13,16 - Change of Disk Status (XT BIOS from 1/10/86 & newer)
-                assert_eq!(pcpu.dx&0xff,0); // drive a:
+                //assert_eq!(pcpu.dx&0xff,0); // drive a:
                 pcpu.ax=0x0000|(pcpu.ax&0xff);
-                pcpu.setCflag(false); // CF = 0 if successful
+                //pcpu.setCflag(false); // CF = 0 if successful
+                pcpu.setCflag(true); // CF = 0 if successful
                 return true;
             }
             else
@@ -619,7 +658,8 @@ impl machine
                         10 - 3 drive	     11 - 4 drives                    
             */            
 
-            pcpu.ax=0x5115; // 101 0100 0100 0101
+            //pcpu.ax=0x5115; // 101 0100 0100 0101
+            pcpu.ax=0x5426;
             return true;
         }
         else if intNum==0x5

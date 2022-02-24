@@ -1,27 +1,44 @@
-/* FDD fake controller ftw */
+
+/* FDD/HD high level emulation */
 
 use std::io::prelude::*;
 use std::fs::File;
 use std::io::SeekFrom;
 use std::process;
+use std::fs;
 
 
 use crate::vga::vga;
 use crate::machine::machine;
 
+#[derive(PartialEq)]
+pub enum mediaType
+{
+    hardDisk,
+    floppy144
+}
 
 pub struct fddController
 {
-    fddFullPath: String
+    fddFullPath: String,
+    diskType: mediaType
 }
 
 impl fddController
 {
-    pub fn new(diskImage:String) -> Self 
+    pub fn new(diskImage:&String) -> Self 
     {
+        let mut mType=mediaType::floppy144;
+        let fileLen = fs::metadata(diskImage).unwrap().len();
+        if fileLen>1474560
+        {
+            mType=mediaType::hardDisk;
+        }
+
         fddController
         {
-            fddFullPath: diskImage.clone()
+            fddFullPath: diskImage.clone(),
+            diskType: mType
         }
     }
 
@@ -29,15 +46,24 @@ impl fddController
                            sectorNumber:u64,cylinderNumber:u64,_headNumber:u64,
                            loAddr:u16,hiAddr:u16)
     {
-        // we assume we have a 1.44 diskette in
         let bytesPerSector=512;
-        let sectorsPerTrack=18; // 3 1/2
-        //let sectorsPerTrack=9; // 5 1/4
+        let sectorsPerTrack;
+        let headsPerCylinder;
 
-        /*LBA = (Cylinder × HeadsPerCylinder + Head) × SectorPerTrack + (Sector − 1)
-          For a 1.44Mb 3.5" SectorsPerTrack = 18, MaxTrack = 80 HeadsPerCylinder = 2 BytesPerSector = 512*/
+        if self.diskType==mediaType::floppy144
+        {
+            sectorsPerTrack=18;
+            headsPerCylinder=2;
+        }
+        else
+        {
+            sectorsPerTrack=63;
+            headsPerCylinder=16;
+        }
 
-        let lba:u64=(((cylinderNumber*2)+_headNumber)*sectorsPerTrack)+(sectorNumber);
+        /* LBA = (Cylinder × HeadsPerCylinder + Head) × SectorPerTrack + (Sector − 1) */
+
+        let lba:u64=(((cylinderNumber*headsPerCylinder)+_headNumber)*sectorsPerTrack)+(sectorNumber);
         let imgOffset=lba*bytesPerSector;
 
         let mut f = match File::open(self.fddFullPath.clone()) {

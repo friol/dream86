@@ -44,8 +44,8 @@ fn main()
 
     let _thePIC=pic8259::pic8259::new();
     let mut theVGA=vga::vga::new("./fonts/9x16.png","./fonts/cga8.png");
-    let mut theMachine=machine::machine::new(&comName,0x100000,runMode,machine::machineType::machineCGA);
-    let theDisk=fddController::fddController::new(diskImageName);
+    let theDisk=fddController::fddController::new(&diskImageName);
+    let mut theMachine=machine::machine::new(&comName,0x100000,runMode,machine::machineType::machineEGA);
     let mut theCPU=x86cpu::x86cpu::new(runMode);
     let mut theGUI=guiif::guiif::new(0x02,theCPU.cs,theCPU.ip);
 
@@ -56,7 +56,7 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&mut theVGA,&theMachine,0x28ce,0x2e9e,80);
+        theGUI.drawMemory(&mut theVGA,&theMachine,0x116,0x180,80);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -164,7 +164,6 @@ fn main()
             let mut bailOut=false;
             while !bailOut
             {
-                //profile_method!(theCPU.executeOne);
                 let _dbgstr=theCPU.executeOne(&mut theMachine,&mut theVGA,&theDisk,false,&mut bytesRead,&0,&0);
                 theMachine.update(&mut theCPU);
                 theVGA.update();
@@ -175,6 +174,9 @@ fn main()
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x4110)
                 //if (theCPU.cs==0xdeb) && (theCPU.ip==0x413a)
                 //if _breakIt && ((theCPU.cs==0x2f2) && (theCPU.ip==0x1460)) // int 21h
+                //if _breakIt && ((theCPU.cs==0x19) && (theCPU.ip==0x40f8)) // int 21h dos 6.22
+                //if (theCPU.cs==0x19) && (theCPU.ip==0xa872)
+                //if (theCPU.cs==0x19) && (theCPU.ip==0x7736)
                 //if (theCPU.cs==0xdfb) && (theCPU.ip==0x4adc)
                 //if (theCPU.cs==0x0e88) && (theCPU.ip==0x02ed)
                 //if (theCPU.cs==0xe00) && (theCPU.ip==0x4c7)
@@ -185,7 +187,11 @@ fn main()
                 //if (theCPU.cs==0x24ac) && (theCPU.ip==0x340)
                 //if (theCPU.cs==0x1a79) && (theCPU.ip==0x00d7)
                 //if (theCPU.cs==0x0c3a) && (theCPU.ip==0x138)
-                //if (theCPU.cs==0xec9) && (theCPU.ip==0x2A14)
+                //if (theCPU.cs==0x70) && (theCPU.ip==0x1bcd)
+                //if (theCPU.cs==0x8ec1) && (theCPU.ip==0x4bf)
+                //if (theCPU.cs==0x9f84) && (theCPU.ip==0x420)
+                //if (theCPU.cs==0x70) && (theCPU.ip==0x1e41)
+                //if (theCPU.cs==0x8ec1) && (theCPU.ip==0x0536)
                 if false
                 {
                     bailOut=true;
@@ -196,7 +202,7 @@ fn main()
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&mut theVGA,&theMachine,0x0dfb,0x49f0,80);
+                    theGUI.drawMemory(&mut theVGA,&theMachine,0x0a0a,0x0,80);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 
@@ -217,4 +223,3 @@ fn main()
         }
     }
 }
-

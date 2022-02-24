@@ -121,6 +121,7 @@ pub enum instructionType
     instrDaa,
     instrAaa,
     instrSalc,
+    instrWait,
     instrFninit,
     instrFnstsw,
 }
@@ -188,12 +189,15 @@ impl x86cpu
 
         if runMode==0
         {
+            //let hdsize=819200;
+            let hdsize=492912;
+
             x86cpu
             {
-                ax: 0,
+                ax: ((hdsize&0xffff) as u16) as u16,//0,
                 bx: 0,
-                cx: 0,
-                dx: 0,
+                cx: 0,//(hdsize>>16) as u16,
+                dx: 0x80,//0,
                 si: 0,
                 di: 0,
                 bp: 0,
@@ -408,6 +412,10 @@ impl x86cpu
             { 
                 dst=self.bx;
             }
+            else if operand1=="[SI]" 
+            { 
+                dst=self.si;
+            }
             else if operand1=="[BX+DI]" 
             { 
                 let mut offs32:i32=self.bx as i32;
@@ -473,9 +481,9 @@ impl x86cpu
 
             self.moveToDestination(&(val2shift as u16),&operand1,pmachine,pvga);
 
-            self.doZflag(val2shift as u16);
+            /*self.doZflag(val2shift as u16);
             self.doPflag(val2shift as u16);
-            self.doSflag(val2shift as u16,self.decInstr.instrSize);
+            self.doSflag(val2shift as u16,self.decInstr.instrSize);*/
         }
         else
         {
@@ -493,9 +501,9 @@ impl x86cpu
 
             self.moveToDestination(&(val2shift as u16),&operand1,pmachine,pvga);
 
-            self.doZflag(val2shift as u16);
+            /*self.doZflag(val2shift as u16);
             self.doPflag(val2shift as u16);
-            self.doSflag(val2shift as u16,self.decInstr.instrSize);
+            self.doSflag(val2shift as u16,self.decInstr.instrSize);*/
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -526,9 +534,9 @@ impl x86cpu
 
             self.moveToDestination(&(val2shift as u16),&operand1,pmachine,pvga);
 
-            self.doZflag(val2shift as u16);
+            /*self.doZflag(val2shift as u16);
             self.doPflag(val2shift as u16);
-            self.doSflag(val2shift as u16,self.decInstr.instrSize);
+            self.doSflag(val2shift as u16,self.decInstr.instrSize);*/
         }
         else
         {
@@ -546,9 +554,9 @@ impl x86cpu
 
             self.moveToDestination(&(val2shift as u16),&operand1,pmachine,pvga);
 
-            self.doZflag(val2shift as u16);
+            /*self.doZflag(val2shift as u16);
             self.doPflag(val2shift as u16);
-            self.doSflag(val2shift as u16,self.decInstr.instrSize);
+            self.doSflag(val2shift as u16,self.decInstr.instrSize);*/
         }
 
         self.ip+=self.decInstr.insLen as u16;
@@ -3078,6 +3086,7 @@ impl x86cpu
         else if it=="Aaa" { return instructionType::instrAaa; }
         else if it=="Aas" { return instructionType::instrAas; }
         else if it=="Salc" { return instructionType::instrSalc; }
+        else if it=="Wait" { return instructionType::instrWait; }
         else if it=="Fninit" { return instructionType::instrFninit; }
         else if it=="Fnstsw" { return instructionType::instrFnstsw; }
         else if it=="SbbNMRR" { return instructionType::instrSbbNoModRegRm; }
@@ -3340,6 +3349,8 @@ impl x86cpu
             0x9e => { return ["SAHF","8","0","","","Sahf","0"]; }
             // SALC
             0xd6 => { return ["SALC","8","0","","","Salc","0"]; }
+            // SALC
+            0x9b => { return ["WAIT","8","0","","","Wait","0"]; }
 
             0xd4 => { return ["AAM","8","1","ib","","Aam","0"]; }
             0xd5 => { return ["AAD","16","0","","","Aad","0"]; }
@@ -4196,6 +4207,10 @@ impl x86cpu
             {
                 offs=self.bx;
             }
+            else if self.decInstr.operand1.contains("[BX+Disp]")
+            {
+                offs=self.bx+self.decInstr.displacement as u16;
+            }
             else if self.decInstr.operand1.contains("[DI+Disp]")
             {
                 offs=self.di+self.decInstr.displacement as u16;
@@ -4406,6 +4421,11 @@ impl x86cpu
         else if self.decInstr.insType==instructionType::instrLahf
         {
             self.ax=(self.ax&0xff)|((self.flags&0xff)<<8);
+            self.ip+=self.decInstr.insLen as u16;
+        }
+        else if self.decInstr.insType==instructionType::instrWait
+        {
+            // not implemented TODO
             self.ip+=self.decInstr.insLen as u16;
         }
         else if self.decInstr.insType==instructionType::instrSahf
