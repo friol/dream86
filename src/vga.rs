@@ -10,7 +10,8 @@ pub struct vga
     pub mode: u16,
     pub framebuffer: Vec<u8>,
     pub cgaFramebuffer: Vec<u8>,
-    pub font9x16data:Vec<Vec<u32>>,
+    pub tempFramebuf: Vec<u32>,
+    pub font9x16data:Vec<Vec<u8>>,
     pub font9x16width:u32,
     pub font9x16height:u32,
     pub font8x8data:Vec<Vec<u32>>,
@@ -51,6 +52,7 @@ impl vga
         else if (videomodeNum==0x00) || (videomodeNum==0x01)
         {
             // 40x25 textmode 9x16
+            // TODO: clear screen
             self.mode=videomodeNum;
         }
         else if (videomodeNum==0x02) || (videomodeNum==0x03)
@@ -345,7 +347,7 @@ impl vga
         {
             // CGA 320x200 modes
             // EGA 320x200 mode
-            let mut tempFb:Vec<u32>=Vec::new();
+            //let mut tempFb:Vec<u32>=Vec::new();
             let mut tempChar:Vec<u8>=Vec::new();
 
             if ochar>=0x80
@@ -363,7 +365,7 @@ impl vga
 
             for _i in 0..nchars
             {
-                self.drawCharOnScreen(&mut tempFb,
+                self.drawCharOnScreen(
                     8,8,
                     32,
                     ochar as u32,
@@ -466,7 +468,6 @@ impl vga
     }
 
     fn drawCharOnScreen(&mut self,
-        vecDest:&mut Vec<u32>,
         charDimX:u32,
         charDimY:u32,
         numCharsPerRow:u32,
@@ -484,14 +485,14 @@ impl vga
 
         if (self.mode==0x02) || (self.mode==0x03)
         {
+            let colorArr=Vec::from([bgCol,fgCol]);
             let mut destPos=dstx+(dsty*scrInc);
             for _y in 0..charDimY
             {
                 for _x in 0..charDimX
                 {
                     let curVal=self.font9x16data[srcy as usize][srcx as usize];
-                    let curCol=if curVal==0 { bgCol } else { fgCol };
-                    vecDest[destPos as usize]=curCol;
+                    self.tempFramebuf[destPos as usize]=colorArr[curVal as usize];
                     destPos+=1;
                     srcx+=1;
                 }
@@ -736,17 +737,10 @@ impl vga
             // mode 0,1 - 40x25 text mode, 9x16 chars, 360x400
             // mode 2 - 80x25 text mode, 9x16 chars, 720x400
 
-            let mut resx=720; let mut resy=400; let mut cols=80; let mut rows=25;
+            let mut resx=720; let mut _resy=400; let mut cols=80; let mut rows=25;
             if (self.mode==0x00) || (self.mode==0x01)
             { 
-                resx=360; resy=400; cols=40; rows=25; 
-            }
-
-            let mut idx:usize=0;
-            let mut tempFb:Vec<u32>=Vec::new();
-            for _idx in 0..(resx*resy)            
-            {
-                tempFb.push(0);
+                resx=360; _resy=400; cols=40; rows=25; 
             }
 
             let mut bufIdx=0;
@@ -757,7 +751,8 @@ impl vga
                 let bgCol=(attributes>>4)&0x07;
                 let charNum:u8=self.cgaFramebuffer[bufIdx];
                 let tempVec:Vec<u8>=Vec::new();
-                self.drawCharOnScreen(&mut tempFb,
+                self.drawCharOnScreen
+                (
                     9,16,
                     32,
                     charNum as u32,
@@ -768,9 +763,10 @@ impl vga
                 bufIdx+=2;
             }
 
+            let mut idx:usize=0;
             for i in gui.frameBuffer.iter_mut() 
             {
-                let bufVal=tempFb[idx];
+                let bufVal=self.tempFramebuf[idx];
                 *i = bufVal;
                 idx+=1;
             }        
@@ -936,25 +932,50 @@ impl vga
     {
         // load fonts
 
-        let myFont9x16 = image::open(font9x16).unwrap().to_rgb8();
+        let fFont9x16 = match image::open(font9x16) {
+            Ok(f) => f,
+            Err(_e) => {
+                println!("Unable to open file {}",font9x16);
+                process::exit(0x0100);
+            }
+        };
+
+        let myFont9x16 = fFont9x16.to_rgb8();
+
         let img_width = myFont9x16.dimensions().0 as u32;
         let img_height = myFont9x16.dimensions().1 as u32;
 
-        let mut font9x16vec:Vec<Vec<u32>>=Vec::new();
+        let mut font9x16vec:Vec<Vec<u8>>=Vec::new();
         for y in 0..img_height
         {
-            let mut newLine:Vec<u32>=Vec::new();
+            let mut newLine:Vec<u8>=Vec::new();
             for x in 0..img_width
             {
                 let imgPixel=myFont9x16.get_pixel(x,y);
                 let r=imgPixel[0] as u32; let g=imgPixel[1] as u32; let b=imgPixel[2] as u32;
                 let u32val:u32=r|(g<<8)|(b<<16);
-                newLine.push(u32val);
+                if u32val==0
+                {
+                    newLine.push(0);
+                }
+                else
+                {
+                    newLine.push(1);
+                }
             }
             font9x16vec.push(newLine);
         }
 
-        let myFont8x8 = image::open(font8x8).unwrap().to_rgb8();
+        let fFont8x8 = match image::open(font8x8) {
+            Ok(f) => f,
+            Err(_e) => {
+                println!("Unable to open file {}",font8x8);
+                process::exit(0x0100);
+            }
+        };
+
+        let myFont8x8 = fFont8x8.to_rgb8();
+
         let img_width8 = myFont8x8.dimensions().0 as u32;
         let img_height8 = myFont8x8.dimensions().1 as u32;
 
@@ -974,13 +995,15 @@ impl vga
 
         // framebuffers
 
-        let fbSize=65536*4; // 64k?
+        let fbSize=65536*6; // >256k
         let mut vgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
         let mut cgaFramebuf:Vec<u8>=Vec::with_capacity(fbSize);
+        let mut tmpFramebuf:Vec<u32>=Vec::with_capacity(fbSize);
         for _i in 0..fbSize
         {
             vgaFramebuf.push(0);
             cgaFramebuf.push(0);
+            tmpFramebuf.push(0);
         }
 
         let defaultVgaPalette = Vec::from(
@@ -1031,6 +1054,7 @@ impl vga
             mode: 2,
             framebuffer: vgaFramebuf,
             cgaFramebuffer: cgaFramebuf,
+            tempFramebuf: tmpFramebuf,
             font9x16data: font9x16vec,
             font9x16width: img_width,
             font9x16height: img_height,

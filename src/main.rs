@@ -32,7 +32,7 @@ fn main()
     let args: Vec<String> = env::args().collect();
     if args.len()!=4
     {
-        println!("syntax: cargo run --release <disk image full path> <com name> <runmode>");        
+        println!("syntax: dream86.exe <disk image full path> <com name> <runmode>");        
         process::exit(0x0);
     }
 
@@ -56,7 +56,8 @@ fn main()
         theGUI.clearScreen();
         theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
         theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-        theGUI.drawMemory(&mut theVGA,&theMachine,0x116,0x180,80);
+        theGUI.drawMemory(&mut theVGA,&theMachine,0x3322,0x29f4,80);
+        theGUI.drawVideoInfo(&mut theVGA);
         theVGA.fbTobuf32(&mut theGUI);
         theGUI.updateVideoWindow(&theVGA);
 
@@ -202,7 +203,8 @@ fn main()
                     theGUI.clearScreen();
                     theGUI.drawDebugArea(&mut theMachine,&mut theVGA,&mut theCPU,&theDisk);
                     theGUI.drawRegisters(&theCPU.getRegisters(),&theCPU.flags,&theCPU.totInstructions,&startTime);
-                    theGUI.drawMemory(&mut theVGA,&theMachine,0x0a0a,0x0,80);
+                    theGUI.drawMemory(&mut theVGA,&theMachine,0x3322,0x29f4,80);
+                    theGUI.drawVideoInfo(&mut theVGA);
                     theVGA.fbTobuf32(&mut theGUI);
                     theGUI.updateVideoWindow(&theVGA);
 
@@ -211,10 +213,7 @@ fn main()
                         bailOut=true;
                     }
 
-                    if theGUI.processKeys(&mut theMachine,&mut theCPU,&mut theVGA)
-                    {
-                        //bailOut=true;
-                    }
+                    theGUI.processKeys(&mut theMachine,&mut theCPU,&mut theVGA);
                     
                     //thread::sleep(time::Duration::from_millis(4));                    
                     inum=0;

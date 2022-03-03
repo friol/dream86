@@ -11,4 +11,4 @@ chrono = "*"
 image = "*"
 
 [profile.release]
-debug = true
+debug = 0 

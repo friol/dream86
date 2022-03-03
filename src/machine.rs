@@ -40,7 +40,7 @@ impl machine
             Ok(f) => f,
             Err(_e) => {
                 println!("Unable to open file {}",fname);
-                return;
+                process::exit(0x0100);
             }
         };
         let biosLen:usize=f.metadata().unwrap().len() as usize;
@@ -64,7 +64,7 @@ impl machine
             Ok(f) => f,
             Err(e) => {
                 println!("Unable to open file {} error:{}",fname,e);
-                return;
+                process::exit(0x0100);
             }
         };
         let comLen:usize=f.metadata().unwrap().len() as usize;
@@ -83,7 +83,7 @@ impl machine
             Ok(f) => f,
             Err(e) => {
                 println!("Unable to open file {} error:{}",fname,e);
-                return;
+                process::exit(0x0100);
             }
         };
         let comLen:usize=f.metadata().unwrap().len() as usize;
@@ -167,8 +167,8 @@ impl machine
         }
         else if (addr8==0x64) || (addr16==0x64)
         {
-            println!("Out to port 0x64");
-            process::exit(0x0100);
+            //println!("Out to port 0x64");
+            //process::exit(0x0100);
         }
         else if (addr8==0x20) || (addr16==0x20)
         {
@@ -203,6 +203,10 @@ impl machine
         else if addr8==0x61
         {
             pcpu.ax=(pcpu.ax&0xff00)|(self.ppi_a as u16);
+        }
+        else if (addr8==0x64) || (addr16==0x64)
+        {
+            // TODO
         }
         else if (addr16==0x3b5) || (addr16==0x3d5)
         {
@@ -284,6 +288,12 @@ impl machine
             {
                 // INT 10,10 - Set/Get Palette Registers (EGA/VGA)
                 // TODO
+                if (pcpu.ax&0xff)==0
+                {
+                    //println!("Setting DAC reg BH {:02x} BL {:02x}",pcpu.bx>>8,pcpu.bx&0xff);
+                    //process::exit(0x0100);
+                }
+
                 return true;
             }
             else if (pcpu.ax&0xff00)==0x0100
@@ -470,7 +480,7 @@ impl machine
             else
             {
                 println!("Unknown interrupt");
-                println!("{:02x},{:02x}",intNum,pcpu.ax>>8);
+                println!("{:02x},{:02x} AL={:02x}",intNum,pcpu.ax>>8,pcpu.ax&0xff);
                 process::exit(0x0100);
             }
         }
@@ -737,6 +747,12 @@ impl machine
                 // INT 15,88 - size of extended memory - should be >=286 only
                 // TODO
                 //pcpu.setCflag(true);
+                return true;
+            }
+            else if (pcpu.ax&0xff00)==0x2400
+            {
+                // INT 15,24 - unknown, called from ELKS
+                // TODO
                 return true;
             }
             else
@@ -1014,7 +1030,7 @@ impl machine
         let i64addr:i64=address.into();
         let flatAddr:i64=i64addr+(i64seg*16);
 
-        if (flatAddr>=0xa0000) && (flatAddr<=0xaffff) ||
+        if ((flatAddr>=0xa0000) && (flatAddr<=0xaffff)) ||
            ((flatAddr>=0xb8000) && (flatAddr<=0xbffff))
         {
             pvga.writeMemory16(flatAddr,val);

@@ -214,6 +214,8 @@ impl guiif
                 Key::Right => pmachine.addKeystroke(0x4d00),
                 Key::NumPadSlash => pmachine.addKeystroke(0x352f),
                 Key::Escape => pmachine.addKeystroke(0x011B),
+                Key::PageUp => pmachine.addKeystroke(0x4900),
+                Key::PageDown => pmachine.addKeystroke(0x5100),
                 _ => return ,
             }
 
@@ -394,6 +396,21 @@ impl guiif
         stdout.queue(style::PrintStyledContent(flagsReg.white())).ok();
 
         stdout.queue(cursor::MoveTo(0,24)).ok();
+        stdout.flush().ok();
+    }
+
+    pub fn drawVideoInfo(&self,pvga:&mut vga)
+    {
+        let vmode=pvga.mode;
+        let mut vstat:String=String::from("");
+        vstat.push_str(&format!("Videomode: {:02x}",vmode));
+
+        let mut stdout = stdout();
+
+        stdout.queue(cursor::MoveTo(20,self.dbgRegline+5)).ok();
+        stdout.queue(style::PrintStyledContent(vstat.white())).ok();
+
+        stdout.queue(cursor::MoveTo(0,36)).ok();
         stdout.flush().ok();
     }
 
