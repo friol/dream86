@@ -668,7 +668,7 @@ impl x86cpu
 
     fn performSar(&mut self,pmachine:&mut machine,pvga:&mut vga)
     {
-        // TODO all the flags (S?)
+        // TODO O flag
         let operand1=self.decInstr.operand1.clone();
         let operand2=self.decInstr.operand2.clone();
         let shiftAmount:u16=self.getOperandValue(&operand2,pmachine,pvga);

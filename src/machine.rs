@@ -755,6 +755,13 @@ impl machine
                 // TODO
                 return true;
             }
+            else if (pcpu.ax&0xff00)==0xC200
+            {
+                // INT 15,C2 - Pointing Device BIOS Interface (PS/2 only)
+                // TODO
+                pcpu.setCflag(false);
+                return true;
+            }
             else
             {
                 println!("Unknown interrupt 0x15");
